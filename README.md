@@ -37,6 +37,6 @@ output "services" {
 
 ## Outputs
 
-The following shows the Terraform output for the `cacheflys_services` data source, displaying the list of services retrieved from CacheFly.
+The following screenshot shows Terraform in action, deploying a new service and retrieving the newly created service.
 
 ![Terraform output for CacheFly services](./doc/hcl_output.png)
