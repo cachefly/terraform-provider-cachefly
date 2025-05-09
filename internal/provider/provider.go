@@ -88,5 +88,7 @@ func (p *cacheflyProvider) DataSources(_ context.Context) []func() datasource.Da
 
 // Resources defines the resources implemented in the provider.
 func (p *cacheflyProvider) Resources(_ context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		func() resource.Resource { return &serviceResource{client: p.client} },
+	}
 }

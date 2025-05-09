@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "cachefly" {
-  api_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjQ0NDMxLCJ1c2VyIjoiNjgxYjNjZmIyNzE1MzEwMDM1Y2I3MmI2IiwidG9rZW4iOiI2ODFiM2YwNTI3MTUzMTAwMzVjYjdiMjQiLCJpYXQiOjE3NDY2MTYwNjl9.afBXIeoOei7c2pwo7_pbTP1ct-iRJs-8TOaqJAhB2qs" # Replace with a valid CacheFly API token
+  api_token = "API-TOKEN" # Replace with a valid CacheFly API token
 }
 
 #data "cachefly_services" "example" {}
