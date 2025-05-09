@@ -33,6 +33,7 @@ data "cachefly_services" "list_services" {
 output "services" {
   value = data.cachefly_services.list_services.services
 }
+```
 
 ## Outputs
 
