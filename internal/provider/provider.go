@@ -189,13 +189,14 @@ func (p *CacheFlyProvider) Resources(ctx context.Context) []func() resource.Reso
 	return []func() resource.Resource{
 		// Service resources
 		resources.NewServiceResource,
+		resources.NewServiceDomainResource,
+		resources.NewOriginResource,
 
 		// Add other resources here as you implement them
-		// resources.NewServiceDomainResource,
 		// resources.NewServiceRuleResource,
 		// resources.NewServiceOptionsResource,
 		// resources.NewCertificateResource,
-		// resources.NewOriginResource,
+
 		// resources.NewUserResource,
 		// resources.NewAccountResource,
 		// resources.NewScriptConfigResource,
@@ -205,15 +206,19 @@ func (p *CacheFlyProvider) Resources(ctx context.Context) []func() resource.Reso
 
 func (p *CacheFlyProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		// Service data sources
+
 		datasources.NewServiceDataSource,
 		// datasources.NewServicesDataSource, // For listing multiple services - not implemented yet
 
+		datasources.NewServiceDomainDataSource,
+		datasources.NewServiceDomainsDataSource,
+
+		datasources.NewOriginDataSource,
+		datasources.NewOriginsDataSource,
+
 		// Add other data sources here as you implement them
-		// datasources.NewServiceDomainsDataSource,
 		// datasources.NewServiceRulesDataSource,
 		// datasources.NewCertificatesDataSource,
-		// datasources.NewOriginsDataSource,
 		// datasources.NewUsersDataSource,
 		// datasources.NewAccountsDataSource,
 		// datasources.NewTLSProfilesDataSource,

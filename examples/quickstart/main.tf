@@ -10,8 +10,10 @@ terraform {
   }
 }
 
+
+
 provider "cachefly" {
-  api_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjQ0NDMxLCJ1c2VyIjoiNjgxYjNjZmIyNzE1MzEwMDM1Y2I3MmI2IiwidG9rZW4iOiI2ODM5YzExMjc4M2NmOTAwNDA1NzY3ZDIiLCJpYXQiOjE3NDg2MTU0NDJ9.6ZU6QW9UVqMkLTKbWr4z1o73BvaA3OqDZqtbu8k353c" 
+  api_token = "your-token" 
 }
 
 # Create your first CDN service
