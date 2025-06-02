@@ -21,7 +21,7 @@ import (
 	"github.com/avvvet/terraform-provider-cachefly/internal/provider/models"
 )
 
-// Ensure provider defined types fully satisfy framework interfaces.
+// satisfy framework interfaces.
 var (
 	_ resource.Resource                = &ServiceDomainResource{}
 	_ resource.ResourceWithImportState = &ServiceDomainResource{}
@@ -129,7 +129,7 @@ func (r *ServiceDomainResource) Create(ctx context.Context, req resource.CreateR
 		Description: data.Description.ValueString(),
 	}
 
-	// Only set validation_mode if provided
+	// we set validation_mode if provided
 	if !data.ValidationMode.IsNull() && !data.ValidationMode.IsUnknown() {
 		createReq.ValidationMode = data.ValidationMode.ValueString()
 	}
@@ -272,7 +272,6 @@ func (r *ServiceDomainResource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), domainID)...)
 }
 
-// Helper function to map SDK ServiceDomain to Terraform state
 func (r *ServiceDomainResource) mapDomainToState(domain *api.ServiceDomain, data *models.ServiceDomainResourceModel) {
 	data.ID = types.StringValue(domain.ID)
 	data.ServiceID = types.StringValue(domain.Service)

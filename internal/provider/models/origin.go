@@ -3,7 +3,7 @@ package models
 
 import "github.com/hashicorp/terraform-plugin-framework/types"
 
-// OriginResourceModel represents the Terraform resource model for cachefly_origin
+// model for cachefly_origin
 type OriginResourceModel struct {
 	ID                     types.String `tfsdk:"id"`
 	Type                   types.String `tfsdk:"type"`
@@ -28,7 +28,7 @@ type OriginResourceModel struct {
 	UpdatedAt types.String `tfsdk:"updated_at"`
 }
 
-// OriginDataSourceModel represents the Terraform data source model for cachefly_origin
+// Terraform data source model for cachefly_origin
 type OriginDataSourceModel struct {
 	ID                     types.String `tfsdk:"id"`
 	Type                   types.String `tfsdk:"type"`
@@ -56,7 +56,7 @@ type OriginDataSourceModel struct {
 	ResponseType types.String `tfsdk:"response_type"`
 }
 
-// OriginsDataSourceModel represents the data source for listing multiple origins
+// represents the data source for listing multiple origins
 type OriginsDataSourceModel struct {
 	Type         types.String `tfsdk:"type"`
 	Offset       types.Int64  `tfsdk:"offset"`

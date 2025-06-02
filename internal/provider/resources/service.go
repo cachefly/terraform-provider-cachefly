@@ -20,7 +20,7 @@ import (
 	"github.com/avvvet/terraform-provider-cachefly/internal/provider/models"
 )
 
-// Ensure provider defined types fully satisfy framework interfaces.
+// satisfy framework interfaces.
 var (
 	_ resource.Resource                = &ServiceResource{}
 	_ resource.ResourceWithConfigure   = &ServiceResource{}
@@ -42,34 +42,7 @@ func (r *ServiceResource) Metadata(ctx context.Context, req resource.MetadataReq
 
 func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: `
-# CacheFly Service Resource
-
-Manages a CacheFly CDN service. A service represents a CDN configuration that defines how content is cached and delivered.
-
-## Example Usage
-
-` + "```hcl" + `
-resource "cachefly_service" "example" {
-  name        = "my-cdn-service"
-  unique_name = "my-unique-service-name"
-  description = "CDN service for my application"
-  
-  auto_ssl           = true
-  configuration_mode = "advanced"
-  delivery_region    = "global"
-  tls_profile        = "modern"
-}
-` + "```" + `
-
-## Import
-
-Services can be imported using their ID:
-
-` + "```bash" + `
-terraform import cachefly_service.example service-id-here
-` + "```" + `
-		`,
+		MarkdownDescription: "A service represents a CDN configuration that defines how content is cached and delivered.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the service.",
@@ -187,7 +160,6 @@ func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest
 	// Always include description in update
 	updateReq.Description = data.Description.ValueString()
 
-	// Check each field individually and only include if explicitly set
 	if !data.AutoSSL.IsNull() && !data.AutoSSL.IsUnknown() {
 		needsUpdate = true
 		updateReq.AutoSSL = data.AutoSSL.ValueBool()
@@ -255,7 +227,6 @@ func (r *ServiceResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	// Get the service from the API using your SDK's GetByID method
 	service, err := r.client.Services.GetByID(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -275,13 +246,11 @@ func (r *ServiceResource) Read(ctx context.Context, req resource.ReadRequest, re
 func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.ServiceResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Create update request using your SDK's UpdateServiceRequest
 	updateReq := api.UpdateServiceRequest{
 		Description: data.Description.ValueString(),
 		AutoSSL:     data.AutoSSL.ValueBool(),
@@ -302,7 +271,6 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 		"id": data.ID.ValueString(),
 	})
 
-	// Update the service via SDK
 	service, err := r.client.Services.UpdateServiceByID(ctx, data.ID.ValueString(), updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -342,8 +310,7 @@ func (r *ServiceResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	// Note: Your SDK doesn't seem to have a Delete method, so we just deactivate
-	// This is typical for CDN services - they're usually deactivated rather than deleted
+	// we do not have delete, so we are using deactivate
 
 	tflog.Debug(ctx, "Deactivated CacheFly service", map[string]interface{}{
 		"id": data.ID.ValueString(),
@@ -354,9 +321,7 @@ func (r *ServiceResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// Helper function to map SDK Service to Terraform state
-// IMPORTANT: Always use what the API returns, not what the user configured
-// This prevents "inconsistent result" errors when API transforms values
+// IMPORTANT: to use what the API returns, not what the user configured
 func (r *ServiceResource) mapServiceToState(service *api.Service, data *models.ServiceResourceModel) {
 	// Core fields - always use API response
 	data.ID = types.StringValue(service.ID)
@@ -366,13 +331,9 @@ func (r *ServiceResource) mapServiceToState(service *api.Service, data *models.S
 	data.CreatedAt = types.StringValue(service.CreatedAt)
 	data.UpdatedAt = types.StringValue(service.UpdatedAt)
 
-	// Configuration fields - use what API actually returned
-	// This handles cases where API transforms or ignores certain values
 	data.AutoSSL = types.BoolValue(service.AutoSSL)
 	data.ConfigurationMode = types.StringValue(service.ConfigurationMode)
 
-	// For optional fields that might not be returned by the API,
-	// preserve the user's configuration if the API doesn't return a value
 	if service.ConfigurationMode == "" && !data.ConfigurationMode.IsNull() {
 		// Keep the user's configuration if API doesn't return anything
 	} else {
@@ -380,8 +341,5 @@ func (r *ServiceResource) mapServiceToState(service *api.Service, data *models.S
 		data.ConfigurationMode = types.StringValue(service.ConfigurationMode)
 	}
 
-	// Note: TLSProfile and DeliveryRegion are not in your Service struct,
-	// so they might be separate API calls or not included in the response.
-	// For now, we'll leave them as user-configured values since the API
-	// doesn't return them in the Service object.
+	// todo: (awet) TLSProfile and DeliveryRegion ,
 }

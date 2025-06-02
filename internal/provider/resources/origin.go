@@ -22,7 +22,7 @@ import (
 	"github.com/avvvet/terraform-provider-cachefly/internal/provider/models"
 )
 
-// Ensure provider defined types fully satisfy framework interfaces.
+// satisfy framework interfaces.
 var (
 	_ resource.Resource                = &OriginResource{}
 	_ resource.ResourceWithImportState = &OriginResource{}

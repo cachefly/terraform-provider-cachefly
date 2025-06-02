@@ -153,7 +153,7 @@ func (p *CacheFlyProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	// Log configuration (without sensitive data)
+	// Log configuration
 	tflog.Debug(ctx, "Configuring CacheFly provider", map[string]interface{}{
 		"base_url": baseURL,
 		"version":  p.version,
@@ -173,10 +173,9 @@ func (p *CacheFlyProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	// Create our provider client wrapper
 	client := cacheflyClient
 
-	// Make the client available to resources and data sources
+	// client available to resources and data sources
 	resp.DataSourceData = client
 	resp.ResourceData = client
 
@@ -191,16 +190,7 @@ func (p *CacheFlyProvider) Resources(ctx context.Context) []func() resource.Reso
 		resources.NewServiceResource,
 		resources.NewServiceDomainResource,
 		resources.NewOriginResource,
-
-		// Add other resources here as you implement them
-		// resources.NewServiceRuleResource,
-		// resources.NewServiceOptionsResource,
-		// resources.NewCertificateResource,
-
-		// resources.NewUserResource,
-		// resources.NewAccountResource,
-		// resources.NewScriptConfigResource,
-		// resources.NewTLSProfileResource,
+		resources.NewServiceOptionsResource,
 	}
 }
 
@@ -208,24 +198,14 @@ func (p *CacheFlyProvider) DataSources(ctx context.Context) []func() datasource.
 	return []func() datasource.DataSource{
 
 		datasources.NewServiceDataSource,
-		// datasources.NewServicesDataSource, // For listing multiple services - not implemented yet
-
 		datasources.NewServiceDomainDataSource,
 		datasources.NewServiceDomainsDataSource,
-
 		datasources.NewOriginDataSource,
 		datasources.NewOriginsDataSource,
-
-		// Add other data sources here as you implement them
-		// datasources.NewServiceRulesDataSource,
-		// datasources.NewCertificatesDataSource,
-		// datasources.NewUsersDataSource,
-		// datasources.NewAccountsDataSource,
-		// datasources.NewTLSProfilesDataSource,
+		datasources.NewServiceOptionsDataSource,
 	}
 }
 
-// New returns a function that creates a new provider instance
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &CacheFlyProvider{
@@ -234,36 +214,15 @@ func New(version string) func() provider.Provider {
 	}
 }
 
-// Helper function to get configuration values with fallback to environment variables
 func getConfigValue(configValue types.String, envVar, defaultValue string) string {
-	// If explicitly set in config, use that
+
 	if !configValue.IsNull() && !configValue.IsUnknown() {
 		return configValue.ValueString()
 	}
 
-	// Otherwise, try environment variable
 	if envValue := os.Getenv(envVar); envValue != "" {
 		return envValue
 	}
 
-	// Finally, use default value
 	return defaultValue
-}
-
-// Placeholder functions for resources and data sources
-// These will be replaced when you implement the actual resources
-
-func NewServiceResource() resource.Resource {
-	// This will be implemented in resources/service_resource.go
-	panic("NewServiceResource not yet implemented")
-}
-
-func NewServiceDataSource() datasource.DataSource {
-	// This will be implemented in datasources/service_data_source.go
-	panic("NewServiceDataSource not yet implemented")
-}
-
-func NewServicesDataSource() datasource.DataSource {
-	// This will be implemented in datasources/services_data_source.go
-	panic("NewServicesDataSource not yet implemented")
 }

@@ -3,7 +3,7 @@ package models
 
 import "github.com/hashicorp/terraform-plugin-framework/types"
 
-// ServiceDomainResourceModel represents the Terraform resource model for cachefly_service_domain
+// Terraform resource model for cachefly_service_domain
 type ServiceDomainResourceModel struct {
 	ID               types.String `tfsdk:"id"`
 	ServiceID        types.String `tfsdk:"service_id"`
@@ -17,7 +17,7 @@ type ServiceDomainResourceModel struct {
 	UpdatedAt        types.String `tfsdk:"updated_at"`
 }
 
-// ServiceDomainDataSourceModel represents the Terraform data source model for cachefly_service_domain
+// represents the Terraform data source model for cachefly_service_domain
 type ServiceDomainDataSourceModel struct {
 	ID               types.String `tfsdk:"id"`
 	ServiceID        types.String `tfsdk:"service_id"`
@@ -34,7 +34,7 @@ type ServiceDomainDataSourceModel struct {
 	ResponseType types.String `tfsdk:"response_type"`
 }
 
-// ServiceDomainsDataSourceModel represents the data source for listing multiple domains
+// represents the data source for listing multiple domains
 type ServiceDomainsDataSourceModel struct {
 	ServiceID    types.String `tfsdk:"service_id"`
 	Search       types.String `tfsdk:"search"`
