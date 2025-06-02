@@ -62,15 +62,15 @@ func (r *OriginResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Optional:    true,
 				Computed:    true,
 			},
-			"hostname": schema.StringAttribute{
+			"host": schema.StringAttribute{
 				Description: "Hostname of the origin server.",
 				Required:    true,
 			},
 			"scheme": schema.StringAttribute{
-				Description: "Protocol scheme (http or https).",
+				Description: "Protocol scheme (HTTP, HTTPS, or FOLLOW).",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("https"),
+				Default:     stringdefault.StaticString("HTTPS"),
 			},
 			"cache_by_query_param": schema.BoolAttribute{
 				Description: "Whether to cache content based on query parameters.",
@@ -168,7 +168,7 @@ func (r *OriginResource) Create(ctx context.Context, req resource.CreateRequest,
 	// Build create request
 	createReq := api.CreateOriginRequest{
 		Type:     data.Type.ValueString(),
-		Hostname: data.Hostname.ValueString(),
+		Hostname: data.Host.ValueString(),
 	}
 
 	// Optional fields
@@ -281,8 +281,8 @@ func (r *OriginResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if !data.Name.IsNull() && !data.Name.IsUnknown() {
 		updateReq.Name = data.Name.ValueString()
 	}
-	if !data.Hostname.IsNull() && !data.Hostname.IsUnknown() {
-		updateReq.Hostname = data.Hostname.ValueString()
+	if !data.Host.IsNull() && !data.Host.IsUnknown() {
+		updateReq.Hostname = data.Host.ValueString()
 	}
 	if !data.Scheme.IsNull() && !data.Scheme.IsUnknown() {
 		updateReq.Scheme = data.Scheme.ValueString()
@@ -372,7 +372,7 @@ func (r *OriginResource) mapOriginToState(origin *api.Origin, data *models.Origi
 	data.ID = types.StringValue(origin.ID)
 	data.Type = types.StringValue(origin.Type)
 	data.Name = types.StringValue(origin.Name)
-	data.Hostname = types.StringValue(origin.Hostname)
+	data.Host = types.StringValue(origin.Hostname)
 	data.Scheme = types.StringValue(origin.Scheme)
 	data.CacheByQueryParam = types.BoolValue(origin.CacheByQueryParam)
 	data.Gzip = types.BoolValue(origin.Gzip)

@@ -1,3 +1,4 @@
+// internal/provider/models/origin.go
 package models
 
 import "github.com/hashicorp/terraform-plugin-framework/types"
@@ -7,7 +8,7 @@ type OriginResourceModel struct {
 	ID                     types.String `tfsdk:"id"`
 	Type                   types.String `tfsdk:"type"`
 	Name                   types.String `tfsdk:"name"`
-	Hostname               types.String `tfsdk:"hostname"`
+	Host                   types.String `tfsdk:"host"`
 	Scheme                 types.String `tfsdk:"scheme"`
 	CacheByQueryParam      types.Bool   `tfsdk:"cache_by_query_param"`
 	Gzip                   types.Bool   `tfsdk:"gzip"`
@@ -32,7 +33,7 @@ type OriginDataSourceModel struct {
 	ID                     types.String `tfsdk:"id"`
 	Type                   types.String `tfsdk:"type"`
 	Name                   types.String `tfsdk:"name"`
-	Hostname               types.String `tfsdk:"hostname"`
+	Host                   types.String `tfsdk:"host"`
 	Scheme                 types.String `tfsdk:"scheme"`
 	CacheByQueryParam      types.Bool   `tfsdk:"cache_by_query_param"`
 	Gzip                   types.Bool   `tfsdk:"gzip"`

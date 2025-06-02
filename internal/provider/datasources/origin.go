@@ -175,7 +175,7 @@ func (d *OriginDataSource) mapOriginToDataSource(origin *api.Origin, data *model
 	data.ID = types.StringValue(origin.ID)
 	data.Type = types.StringValue(origin.Type)
 	data.Name = types.StringValue(origin.Name)
-	data.Hostname = types.StringValue(origin.Hostname)
+	data.Host = types.StringValue(origin.Hostname)
 	data.Scheme = types.StringValue(origin.Scheme)
 	data.CacheByQueryParam = types.BoolValue(origin.CacheByQueryParam)
 	data.Gzip = types.BoolValue(origin.Gzip)
