@@ -11,7 +11,7 @@ terraform {
 }
 
 provider "cachefly" {
-  api_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjQ0NDMxLCJ1c2VyIjoiNjgxYjNjZmIyNzE1MzEwMDM1Y2I3MmI2IiwidG9rZW4iOiI2ODNhOTkwYzc4M2NmOTAwNDA1OGIyZDAiLCJpYXQiOjE3NDg2NzA3MzJ9.WKTnX5S-eeBQ325v04dv7_TYRGgtap341qV4Y21KyD4"
+  api_token = ""
 }
 
 # ===================================================================

@@ -8,12 +8,12 @@ terraform {
 }
 
 provider "cachefly" {
-  api_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjQ0NDMxLCJ1c2VyIjoiNjgxYjNjZmIyNzE1MzEwMDM1Y2I3MmI2IiwidG9rZW4iOiI2ODNkMWU3YTc4M2NmOTAwNDA1YzdmZTQiLCJpYXQiOjE3NDg4MzU5NjJ9.IMvZq_jFCRoR4s8C63cLBmDvy1p-k80GOCWm3bF4o9M"
+  api_token = ""
 }
 
 # Data source to fetch an existing service
 data "cachefly_service" "example" {
-  id = "681b3dc52715310035cb75d4"
+  id = ""
 }
 
 # Enhanced service options with reverse proxy
