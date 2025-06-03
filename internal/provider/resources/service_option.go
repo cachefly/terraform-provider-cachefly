@@ -325,6 +325,44 @@ func (r *ServiceOptionsResource) Schema(ctx context.Context, req resource.Schema
 					},
 				},
 			},
+			"purge_mode": schema.SingleNestedAttribute{
+				MarkdownDescription: "Purge mode configuration.",
+				Optional:            true,
+				Computed:            true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						MarkdownDescription: "Enable custom purge mode.",
+						Optional:            true,
+						Computed:            true,
+						Default:             booldefault.StaticBool(false),
+					},
+					"value": schema.StringAttribute{
+						MarkdownDescription: "Purge mode value. This is computed when enabled is false.",
+						Optional:            true,
+						Computed:            true, // Always computed to allow API to set the value
+						Default:             stringdefault.StaticString("2"),
+					},
+				},
+			},
+			"dir_purge_skip": schema.SingleNestedAttribute{
+				MarkdownDescription: "Directory purge skip configuration.",
+				Optional:            true,
+				Computed:            true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						MarkdownDescription: "Enable directory purge skip.",
+						Optional:            true,
+						Computed:            true,
+						Default:             booldefault.StaticBool(false),
+					},
+					"value": schema.Int64Attribute{
+						MarkdownDescription: "Directory purge skip value. This is computed when enabled is false.",
+						Optional:            true,
+						Computed:            true, // Always computed to allow API to set the value
+						Default:             int64default.StaticInt64(0),
+					},
+				},
+			},
 			"reverse_proxy": schema.SingleNestedAttribute{
 				MarkdownDescription: "Reverse proxy configuration.",
 				Optional:            true,

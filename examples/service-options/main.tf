@@ -13,7 +13,7 @@ provider "cachefly" {
 
 # Data source to fetch an existing service
 data "cachefly_service" "example" {
-  id = ""
+  id = "681b3dc52715310035cb75d4"
 }
 
 # Enhanced service options with reverse proxy
@@ -38,7 +38,7 @@ resource "cachefly_service_options" "minimal" {
   send_xff                = true
 
   force_orig_qstring      = true
-  
+
   # API defaults
   ftp                     = true  
   api_key_enabled         = true 
@@ -64,15 +64,27 @@ resource "cachefly_service_options" "minimal" {
   }
 
   shared_shield = {
-  enabled = true
-  value   = "IAD"  # Value must be one of: IAD, ORD, FRA, VIE
-}
+    enabled = true
+    value   = "IAD"  # Value must be one of: IAD, ORD, FRA, VIE
+  }
 
-origin_hostheader = {
-  enabled = true
-  value   = ["example.com", "api.example.com"]
-}
+  origin_hostheader = {
+    enabled = true
+    value   = ["example.com", "api.example.com"]
+  }
 
+  purge_no_query          = true
+
+  purge_mode = {
+    enabled = true
+    value   = "2"   // value is index for DISABLED EXACT DIRECTORY EXACT_DIRECTORY EXTENSTION 
+  }
+
+  dir_purge_skip = {
+    enabled = true
+    value   = 0  
+  }
+    
   # Reverse proxy configuration
   reverse_proxy = {
     enabled               = true

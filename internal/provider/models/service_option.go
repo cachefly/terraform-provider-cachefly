@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-// Terraform model for service options
+// ServiceOptionsModel represents the Terraform model for service options
 type ServiceOptionsModel struct {
 	ServiceID              types.String             `tfsdk:"service_id"`
 	FTP                    types.Bool               `tfsdk:"ftp"`
@@ -47,9 +47,11 @@ type ServiceOptionsModel struct {
 	TTFBTimeout            basetypes.ObjectValue    `tfsdk:"ttfb_timeout"`
 	OriginHostHeader       basetypes.ObjectValue    `tfsdk:"origin_hostheader"`
 	SharedShield           basetypes.ObjectValue    `tfsdk:"shared_shield"`
+	PurgeMode              basetypes.ObjectValue    `tfsdk:"purge_mode"`
+	DirPurgeSkip           basetypes.ObjectValue    `tfsdk:"dir_purge_skip"`
 }
 
-// represents reverse proxy configuration
+// ReverseProxyConfigModel represents reverse proxy configuration
 type ReverseProxyConfigModel struct {
 	Enabled           types.Bool   `tfsdk:"enabled"`
 	Hostname          types.String `tfsdk:"hostname"`
@@ -61,25 +63,25 @@ type ReverseProxyConfigModel struct {
 	Mode              types.String `tfsdk:"mode"`
 }
 
-// represents an option with enabled/value structure for Terraform
+// OptionModel represents an option with enabled/value structure for Terraform
 type OptionModel struct {
 	Enabled types.Bool  `tfsdk:"enabled"`
 	Value   types.Int64 `tfsdk:"value"`
 }
 
-// represents an option with enabled/array value structure
+// OptionArrayModel represents an option with enabled/array value structure
 type OptionArrayModel struct {
 	Enabled types.Bool `tfsdk:"enabled"`
 	Value   types.List `tfsdk:"value"`
 }
 
-// represents an option with enabled/string value structure
+// OptionStringModel represents an option with enabled/string value structure
 type OptionStringModel struct {
 	Enabled types.Bool   `tfsdk:"enabled"`
 	Value   types.String `tfsdk:"value"`
 }
 
-// implements planmodifier.Object
+// ReverseProxyPlanModifier implements planmodifier.Object
 type ReverseProxyPlanModifier struct{}
 
 // Description returns a human-readable description of the plan modifier.
@@ -382,6 +384,34 @@ func (m *ServiceOptionsModel) ToSDKServiceOptions(ctx context.Context) *api.Serv
 		}
 	}
 
+	// Handle PurgeMode option
+	purgeMode, _ := getOptionStringFromObjectValue(ctx, m.PurgeMode)
+	if purgeMode != nil && purgeMode.Enabled.ValueBool() {
+		opts.PurgeMode = api.Option{
+			Enabled: true,
+			Value:   purgeMode.Value.ValueString(),
+		}
+	} else {
+		opts.PurgeMode = api.Option{
+			Enabled: false,
+			Value:   "2", // Default value when disabled
+		}
+	}
+
+	// Handle DirPurgeSkip option
+	dirPurgeSkip, _ := getOptionFromObjectValue(ctx, m.DirPurgeSkip)
+	if dirPurgeSkip != nil && dirPurgeSkip.Enabled.ValueBool() {
+		opts.DirPurgeSkip = api.Option{
+			Enabled: true,
+			Value:   int(dirPurgeSkip.Value.ValueInt64()),
+		}
+	} else {
+		opts.DirPurgeSkip = api.Option{
+			Enabled: false,
+			Value:   0, // Default value when disabled
+		}
+	}
+
 	// Convert reverse proxy config
 	if m.ReverseProxy != nil && m.ReverseProxy.Enabled.ValueBool() {
 		// When reverse proxy is enabled, include all required fields with proper defaults
@@ -392,12 +422,12 @@ func (m *ServiceOptionsModel) ToSDKServiceOptions(ctx context.Context) *api.Serv
 
 		mode := m.ReverseProxy.Mode.ValueString()
 		if mode == "" {
-			mode = "WEB" // Default
+			mode = "WEB" // Default from working example
 		}
 
 		ttl := int(m.ReverseProxy.TTL.ValueInt64())
 		if ttl == 0 {
-			ttl = 2678400 // Default TTL (31 days)
+			ttl = 2678400 // Default TTL (31 days) from working example
 		}
 
 		// Ensure use_robots_txt is true when enabled (API requirement)
@@ -431,8 +461,6 @@ func (m *ServiceOptionsModel) ToSDKServiceOptions(ctx context.Context) *api.Serv
 	// Initialize all Option fields with defaults
 	opts.RawLogs = api.Option{Enabled: false, Value: ""}
 	opts.BWThrottle = api.Option{Enabled: false, Value: ""}
-	opts.PurgeMode = api.Option{Enabled: false, Value: ""}
-	opts.DirPurgeSkip = api.Option{Enabled: false, Value: ""}
 	opts.SkipPserveExt = api.Option{Enabled: false, Value: ""}
 	opts.HTTPMethods = api.Option{Enabled: false, Value: ""}
 	opts.BWThrottleQuery = api.Option{Enabled: false, Value: ""}
@@ -639,6 +667,61 @@ func (m *ServiceOptionsModel) FromSDKServiceOptions(ctx context.Context, opts *a
 		"enabled": types.BoolType,
 		"value":   types.StringType,
 	}, sharedShieldOption)
+
+	// Convert PurgeMode option
+	purgeModeOption := &OptionStringModel{
+		Enabled: types.BoolValue(opts.PurgeMode.Enabled),
+		Value:   types.StringValue("2"), // Default value
+	}
+
+	// Handle the PurgeMode value (string) - always use API response value
+	if opts.PurgeMode.Value != nil {
+		switch v := opts.PurgeMode.Value.(type) {
+		case string:
+			purgeModeOption.Value = types.StringValue(v)
+		case int:
+			// Handle case where API returns an integer
+			purgeModeOption.Value = types.StringValue(fmt.Sprintf("%d", v))
+		case int64:
+			// Handle case where API returns an int64
+			purgeModeOption.Value = types.StringValue(fmt.Sprintf("%d", v))
+		case float64:
+			// Handle case where API returns a float64
+			purgeModeOption.Value = types.StringValue(fmt.Sprintf("%.0f", v))
+		default:
+			// Keep as default for unknown types
+			purgeModeOption.Value = types.StringValue("2")
+		}
+	}
+
+	m.PurgeMode, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+		"enabled": types.BoolType,
+		"value":   types.StringType,
+	}, purgeModeOption)
+
+	// Convert DirPurgeSkip option
+	dirPurgeSkipOption := &OptionModel{
+		Enabled: types.BoolValue(opts.DirPurgeSkip.Enabled),
+		Value:   types.Int64Value(0), // Default value
+	}
+
+	// Handle the DirPurgeSkip value - always use API response value
+	switch v := opts.DirPurgeSkip.Value.(type) {
+	case int:
+		dirPurgeSkipOption.Value = types.Int64Value(int64(v))
+	case int64:
+		dirPurgeSkipOption.Value = types.Int64Value(v)
+	case float64:
+		dirPurgeSkipOption.Value = types.Int64Value(int64(v))
+	default:
+		// Always use the default when we can't parse the API response
+		dirPurgeSkipOption.Value = types.Int64Value(0)
+	}
+
+	m.DirPurgeSkip, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+		"enabled": types.BoolType,
+		"value":   types.Int64Type,
+	}, dirPurgeSkipOption)
 
 	// Convert reverse proxy config - always populate
 	m.ReverseProxy = &ReverseProxyConfigModel{
