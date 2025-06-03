@@ -363,6 +363,108 @@ func (r *ServiceOptionsResource) Schema(ctx context.Context, req resource.Schema
 					},
 				},
 			},
+			"skip_encoding_ext": schema.SingleNestedAttribute{
+				Description: "Skip encoding for specified file extensions",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						Description: "Enable skip encoding extensions",
+						Optional:    true,
+						Computed:    true,
+					},
+					"value": schema.ListAttribute{
+						Description: "List of file extensions to skip encoding",
+						ElementType: types.StringType,
+						Optional:    true,
+						Computed:    true,
+					},
+				},
+			},
+			"redirect": schema.SingleNestedAttribute{
+				Description: "Redirect configuration",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						Description: "Enable redirect",
+						Optional:    true,
+						Computed:    true,
+					},
+					"value": schema.StringAttribute{
+						Description: "Redirect URL",
+						Optional:    true,
+						Computed:    true,
+					},
+				},
+			},
+			"bw_throttle": schema.SingleNestedAttribute{
+				Description: "Bandwidth throttle configuration",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						Description: "Enable bandwidth throttling",
+						Optional:    true,
+						Computed:    true,
+					},
+					"value": schema.Int64Attribute{
+						Description: "Bandwidth throttle value in bytes per second",
+						Optional:    true,
+						Computed:    true,
+					},
+				},
+			},
+			"http_methods": schema.SingleNestedAttribute{
+				Description: "HTTP methods configuration",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						Description: "Enable HTTP methods filtering",
+						Optional:    true,
+						Computed:    true,
+					},
+					"value": schema.SingleNestedAttribute{
+						Description: "HTTP methods settings",
+						Optional:    true,
+						Computed:    true,
+						Attributes: map[string]schema.Attribute{
+							"get": schema.BoolAttribute{
+								Description: "Allow GET requests",
+								Optional:    true,
+								Computed:    true,
+							},
+							"head": schema.BoolAttribute{
+								Description: "Allow HEAD requests",
+								Optional:    true,
+								Computed:    true,
+							},
+							"options": schema.BoolAttribute{
+								Description: "Allow OPTIONS requests",
+								Optional:    true,
+								Computed:    true,
+							},
+							"put": schema.BoolAttribute{
+								Description: "Allow PUT requests",
+								Optional:    true,
+								Computed:    true,
+							},
+							"post": schema.BoolAttribute{
+								Description: "Allow POST requests",
+								Optional:    true,
+								Computed:    true,
+							},
+							"patch": schema.BoolAttribute{
+								Description: "Allow PATCH requests",
+								Optional:    true,
+								Computed:    true,
+							},
+							"delete": schema.BoolAttribute{
+								Description: "Allow DELETE requests",
+								Optional:    true,
+								Computed:    true,
+							},
+						},
+					},
+				},
+			},
 			"reverse_proxy": schema.SingleNestedAttribute{
 				MarkdownDescription: "Reverse proxy configuration.",
 				Optional:            true,

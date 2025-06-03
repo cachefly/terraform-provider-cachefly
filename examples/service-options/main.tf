@@ -24,7 +24,6 @@ resource "cachefly_service_options" "minimal" {
   cors                     = true
   brotli_compression      = true
   brotli_support          = true
-  auto_redirect           = false
   serve_stale             = true
   
   # Basic caching options
@@ -83,6 +82,40 @@ resource "cachefly_service_options" "minimal" {
   dir_purge_skip = {
     enabled = true
     value   = 0  
+  }
+
+  # Service Delivery configuration options
+
+  http_methods = {
+    enabled = true
+    value = {
+      get     = true
+      head    = true
+      options = true
+      put     = false
+      post    = false
+      patch   = false
+      delete  = true
+    }
+  }
+
+  skip_encoding_ext = {
+    enabled = true
+    value   = ["jpg", "png", "gif", "mp4", "pdf"]
+  }
+
+  livestreaming             = true
+  link_preheat              = true
+  auto_redirect             = true
+
+  redirect = {
+    enabled = true
+    value   = "https://www.yellow.com/"
+  }
+
+  bw_throttle = {
+    enabled = true
+    value   = 70656
   }
     
   # Reverse proxy configuration

@@ -49,6 +49,10 @@ type ServiceOptionsModel struct {
 	SharedShield           basetypes.ObjectValue    `tfsdk:"shared_shield"`
 	PurgeMode              basetypes.ObjectValue    `tfsdk:"purge_mode"`
 	DirPurgeSkip           basetypes.ObjectValue    `tfsdk:"dir_purge_skip"`
+	HTTPMethods            basetypes.ObjectValue    `tfsdk:"http_methods"`
+	SkipEncodingExt        basetypes.ObjectValue    `tfsdk:"skip_encoding_ext"`
+	Redirect               basetypes.ObjectValue    `tfsdk:"redirect"`
+	BWThrottle             basetypes.ObjectValue    `tfsdk:"bw_throttle"`
 }
 
 // ReverseProxyConfigModel represents reverse proxy configuration
@@ -79,6 +83,23 @@ type OptionArrayModel struct {
 type OptionStringModel struct {
 	Enabled types.Bool   `tfsdk:"enabled"`
 	Value   types.String `tfsdk:"value"`
+}
+
+// HTTPMethodsModel represents the HTTP methods configuration
+type HTTPMethodsModel struct {
+	GET     types.Bool `tfsdk:"get"`
+	HEAD    types.Bool `tfsdk:"head"`
+	OPTIONS types.Bool `tfsdk:"options"`
+	PUT     types.Bool `tfsdk:"put"`
+	POST    types.Bool `tfsdk:"post"`
+	PATCH   types.Bool `tfsdk:"patch"`
+	DELETE  types.Bool `tfsdk:"delete"`
+}
+
+// OptionHTTPMethodsModel represents an option with enabled/http methods value structure
+type OptionHTTPMethodsModel struct {
+	Enabled types.Bool   `tfsdk:"enabled"`
+	Value   types.Object `tfsdk:"value"`
 }
 
 // ReverseProxyPlanModifier implements planmodifier.Object
@@ -187,6 +208,21 @@ func getOptionStringFromObjectValue(ctx context.Context, objVal basetypes.Object
 	diags := objVal.As(ctx, &option, basetypes.ObjectAsOptions{})
 	if diags.HasError() {
 		return nil, fmt.Errorf("failed to convert ObjectValue to OptionStringModel")
+	}
+
+	return &option, nil
+}
+
+// getOptionHTTPMethodsFromObjectValue extracts OptionHTTPMethodsModel from ObjectValue
+func getOptionHTTPMethodsFromObjectValue(ctx context.Context, objVal basetypes.ObjectValue) (*OptionHTTPMethodsModel, error) {
+	if objVal.IsNull() || objVal.IsUnknown() {
+		return nil, nil
+	}
+
+	var option OptionHTTPMethodsModel
+	diags := objVal.As(ctx, &option, basetypes.ObjectAsOptions{})
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to convert ObjectValue to OptionHTTPMethodsModel")
 	}
 
 	return &option, nil
@@ -412,6 +448,74 @@ func (m *ServiceOptionsModel) ToSDKServiceOptions(ctx context.Context) *api.Serv
 		}
 	}
 
+	// Handle HTTPMethods option
+	httpMethods, _ := getOptionHTTPMethodsFromObjectValue(ctx, m.HTTPMethods)
+	if httpMethods != nil && httpMethods.Enabled.ValueBool() {
+		// Extract the HTTP methods configuration
+		var methodsConfig HTTPMethodsModel
+		if !httpMethods.Value.IsNull() && !httpMethods.Value.IsUnknown() {
+			diags := httpMethods.Value.As(ctx, &methodsConfig, basetypes.ObjectAsOptions{})
+			if !diags.HasError() {
+				// Convert to map for API
+				methodsMap := map[string]bool{
+					"GET":     methodsConfig.GET.ValueBool(),
+					"HEAD":    methodsConfig.HEAD.ValueBool(),
+					"OPTIONS": methodsConfig.OPTIONS.ValueBool(),
+					"PUT":     methodsConfig.PUT.ValueBool(),
+					"POST":    methodsConfig.POST.ValueBool(),
+					"PATCH":   methodsConfig.PATCH.ValueBool(),
+					"DELETE":  methodsConfig.DELETE.ValueBool(),
+				}
+
+				opts.HTTPMethods = api.Option{
+					Enabled: true,
+					Value:   methodsMap,
+				}
+			} else {
+				// Fallback to default disabled state
+				opts.HTTPMethods = api.Option{
+					Enabled: false,
+					Value: map[string]bool{
+						"GET":     true,
+						"HEAD":    true,
+						"OPTIONS": true,
+						"PUT":     false,
+						"POST":    false,
+						"PATCH":   false,
+						"DELETE":  false,
+					},
+				}
+			}
+		} else {
+			// Default values when enabled but no value provided
+			opts.HTTPMethods = api.Option{
+				Enabled: true,
+				Value: map[string]bool{
+					"GET":     true,
+					"HEAD":    true,
+					"OPTIONS": true,
+					"PUT":     false,
+					"POST":    false,
+					"PATCH":   false,
+					"DELETE":  false,
+				},
+			}
+		}
+	} else {
+		opts.HTTPMethods = api.Option{
+			Enabled: false,
+			Value: map[string]bool{
+				"GET":     true,
+				"HEAD":    true,
+				"OPTIONS": true,
+				"PUT":     false,
+				"POST":    false,
+				"PATCH":   false,
+				"DELETE":  false,
+			},
+		}
+	}
+
 	// Convert reverse proxy config
 	if m.ReverseProxy != nil && m.ReverseProxy.Enabled.ValueBool() {
 		// When reverse proxy is enabled, include all required fields with proper defaults
@@ -454,19 +558,68 @@ func (m *ServiceOptionsModel) ToSDKServiceOptions(ctx context.Context) *api.Serv
 		}
 	}
 
+	// Handle SkipEncodingExt option
+	skipEncodingExt, _ := getOptionArrayFromObjectValue(ctx, m.SkipEncodingExt)
+	if skipEncodingExt != nil && skipEncodingExt.Enabled.ValueBool() {
+		// Convert types.List to slice for API
+		var valueSlice []interface{}
+		if !skipEncodingExt.Value.IsNull() && !skipEncodingExt.Value.IsUnknown() {
+			elements := skipEncodingExt.Value.Elements()
+			for _, element := range elements {
+				if strVal, ok := element.(types.String); ok {
+					valueSlice = append(valueSlice, strVal.ValueString())
+				}
+			}
+		}
+
+		opts.SkipEncodingExt = api.Option{
+			Enabled: true,
+			Value:   valueSlice,
+		}
+	} else {
+		opts.SkipEncodingExt = api.Option{
+			Enabled: false,
+			Value:   []interface{}{}, // Empty array as default
+		}
+	}
+
+	// Handle Redirect option
+	redirect, _ := getOptionStringFromObjectValue(ctx, m.Redirect)
+	if redirect != nil && redirect.Enabled.ValueBool() {
+		opts.Redirect = api.Option{
+			Enabled: true,
+			Value:   redirect.Value.ValueString(),
+		}
+	} else {
+		opts.Redirect = api.Option{
+			Enabled: false,
+			Value:   "", // Empty string as default
+		}
+	}
+
+	// Handle BWThrottle option
+	bwThrottle, _ := getOptionFromObjectValue(ctx, m.BWThrottle)
+	if bwThrottle != nil && bwThrottle.Enabled.ValueBool() {
+		opts.BWThrottle = api.Option{
+			Enabled: true,
+			Value:   int(bwThrottle.Value.ValueInt64()),
+		}
+	} else {
+		opts.BWThrottle = api.Option{
+			Enabled: false,
+			Value:   8192, // Default value when disabled
+		}
+	}
+
 	// Initialize required arrays
 	opts.MimeTypesOverrides = make([]api.MimeTypeOverride, 0)
 	opts.ExpiryHeaders = make([]api.ExpiryHeader, 0)
 
-	// Initialize all Option fields with defaults
+	// Initialize all remaining Option fields with defaults
 	opts.RawLogs = api.Option{Enabled: false, Value: ""}
-	opts.BWThrottle = api.Option{Enabled: false, Value: ""}
 	opts.SkipPserveExt = api.Option{Enabled: false, Value: ""}
-	opts.HTTPMethods = api.Option{Enabled: false, Value: ""}
 	opts.BWThrottleQuery = api.Option{Enabled: false, Value: ""}
 	opts.Slice = api.Option{Enabled: false, Value: ""}
-	opts.Redirect = api.Option{Enabled: false, Value: ""}
-	opts.SkipEncodingExt = api.Option{Enabled: false, Value: ""}
 
 	return opts
 }
@@ -723,6 +876,96 @@ func (m *ServiceOptionsModel) FromSDKServiceOptions(ctx context.Context, opts *a
 		"value":   types.Int64Type,
 	}, dirPurgeSkipOption)
 
+	// Convert HTTPMethods option
+	httpMethodsOption := &OptionHTTPMethodsModel{
+		Enabled: types.BoolValue(opts.HTTPMethods.Enabled),
+		Value: types.ObjectNull(map[string]attr.Type{
+			"get":     types.BoolType,
+			"head":    types.BoolType,
+			"options": types.BoolType,
+			"put":     types.BoolType,
+			"post":    types.BoolType,
+			"patch":   types.BoolType,
+			"delete":  types.BoolType,
+		}), // Default null value
+	}
+
+	// Handle the HTTPMethods value (map of method -> bool)
+	if opts.HTTPMethods.Value != nil {
+		switch v := opts.HTTPMethods.Value.(type) {
+		case map[string]bool:
+			// Create HTTPMethodsModel from the map
+			methodsConfig := HTTPMethodsModel{
+				GET:     types.BoolValue(v["GET"]),
+				HEAD:    types.BoolValue(v["HEAD"]),
+				OPTIONS: types.BoolValue(v["OPTIONS"]),
+				PUT:     types.BoolValue(v["PUT"]),
+				POST:    types.BoolValue(v["POST"]),
+				PATCH:   types.BoolValue(v["PATCH"]),
+				DELETE:  types.BoolValue(v["DELETE"]),
+			}
+
+			// Convert to ObjectValue
+			httpMethodsOption.Value, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+				"get":     types.BoolType,
+				"head":    types.BoolType,
+				"options": types.BoolType,
+				"put":     types.BoolType,
+				"post":    types.BoolType,
+				"patch":   types.BoolType,
+				"delete":  types.BoolType,
+			}, methodsConfig)
+		case map[string]interface{}:
+			// Handle case where API returns map[string]interface{}
+			methodsConfig := HTTPMethodsModel{
+				GET:     types.BoolValue(getBoolFromInterface(v["GET"])),
+				HEAD:    types.BoolValue(getBoolFromInterface(v["HEAD"])),
+				OPTIONS: types.BoolValue(getBoolFromInterface(v["OPTIONS"])),
+				PUT:     types.BoolValue(getBoolFromInterface(v["PUT"])),
+				POST:    types.BoolValue(getBoolFromInterface(v["POST"])),
+				PATCH:   types.BoolValue(getBoolFromInterface(v["PATCH"])),
+				DELETE:  types.BoolValue(getBoolFromInterface(v["DELETE"])),
+			}
+
+			// Convert to ObjectValue
+			httpMethodsOption.Value, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+				"get":     types.BoolType,
+				"head":    types.BoolType,
+				"options": types.BoolType,
+				"put":     types.BoolType,
+				"post":    types.BoolType,
+				"patch":   types.BoolType,
+				"delete":  types.BoolType,
+			}, methodsConfig)
+		default:
+			// Keep as null for unknown types
+			httpMethodsOption.Value = types.ObjectNull(map[string]attr.Type{
+				"get":     types.BoolType,
+				"head":    types.BoolType,
+				"options": types.BoolType,
+				"put":     types.BoolType,
+				"post":    types.BoolType,
+				"patch":   types.BoolType,
+				"delete":  types.BoolType,
+			})
+		}
+	}
+
+	m.HTTPMethods, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+		"enabled": types.BoolType,
+		"value": types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"get":     types.BoolType,
+				"head":    types.BoolType,
+				"options": types.BoolType,
+				"put":     types.BoolType,
+				"post":    types.BoolType,
+				"patch":   types.BoolType,
+				"delete":  types.BoolType,
+			},
+		},
+	}, httpMethodsOption)
+
 	// Convert reverse proxy config - always populate
 	m.ReverseProxy = &ReverseProxyConfigModel{
 		Enabled:           types.BoolValue(opts.ReverseProxy.Enabled),
@@ -733,5 +976,110 @@ func (m *ServiceOptionsModel) FromSDKServiceOptions(ctx context.Context, opts *a
 		OriginScheme:      types.StringValue(opts.ReverseProxy.OriginScheme),
 		UseRobotsTXT:      types.BoolValue(opts.ReverseProxy.UseRobotsTXT),
 		Mode:              types.StringValue(opts.ReverseProxy.Mode),
+	}
+
+	// Convert SkipEncodingExt option
+	skipEncodingExtOption := &OptionArrayModel{
+		Enabled: types.BoolValue(opts.SkipEncodingExt.Enabled),
+		Value:   types.ListNull(types.StringType), // Default empty list
+	}
+
+	// Handle the SkipEncodingExt value (array)
+	if opts.SkipEncodingExt.Value != nil {
+		switch v := opts.SkipEncodingExt.Value.(type) {
+		case []interface{}:
+			// Convert slice to types.List
+			var stringValues []attr.Value
+			for _, item := range v {
+				if str, ok := item.(string); ok {
+					stringValues = append(stringValues, types.StringValue(str))
+				}
+			}
+			if len(stringValues) > 0 {
+				skipEncodingExtOption.Value, _ = types.ListValue(types.StringType, stringValues)
+			}
+		case []string:
+			// Handle direct string slice
+			var stringValues []attr.Value
+			for _, str := range v {
+				stringValues = append(stringValues, types.StringValue(str))
+			}
+			if len(stringValues) > 0 {
+				skipEncodingExtOption.Value, _ = types.ListValue(types.StringType, stringValues)
+			}
+		default:
+			// Keep as empty list for unknown types
+			skipEncodingExtOption.Value = types.ListNull(types.StringType)
+		}
+	}
+
+	m.SkipEncodingExt, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+		"enabled": types.BoolType,
+		"value":   types.ListType{ElemType: types.StringType},
+	}, skipEncodingExtOption)
+
+	// Convert Redirect option
+	redirectOption := &OptionStringModel{
+		Enabled: types.BoolValue(opts.Redirect.Enabled),
+		Value:   types.StringValue(""), // Default empty string
+	}
+
+	// Handle the Redirect value (string)
+	if opts.Redirect.Value != nil {
+		switch v := opts.Redirect.Value.(type) {
+		case string:
+			redirectOption.Value = types.StringValue(v)
+		default:
+			// Keep as empty string for unknown types
+			redirectOption.Value = types.StringValue("")
+		}
+	}
+
+	m.Redirect, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+		"enabled": types.BoolType,
+		"value":   types.StringType,
+	}, redirectOption)
+
+	// Convert BWThrottle option
+	bwThrottleOption := &OptionModel{
+		Enabled: types.BoolValue(opts.BWThrottle.Enabled),
+		Value:   types.Int64Value(8192), // Default value
+	}
+
+	// Handle the BWThrottle value
+	switch v := opts.BWThrottle.Value.(type) {
+	case int:
+		bwThrottleOption.Value = types.Int64Value(int64(v))
+	case int64:
+		bwThrottleOption.Value = types.Int64Value(v)
+	case float64:
+		bwThrottleOption.Value = types.Int64Value(int64(v))
+	default:
+		if opts.BWThrottle.Enabled {
+			bwThrottleOption.Value = types.Int64Value(8192) // Conservative fallback
+		} else {
+			bwThrottleOption.Value = types.Int64Value(8192) // Default when disabled
+		}
+	}
+
+	m.BWThrottle, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+		"enabled": types.BoolType,
+		"value":   types.Int64Type,
+	}, bwThrottleOption)
+}
+
+// getBoolFromInterface safely converts interface{} to bool
+func getBoolFromInterface(v interface{}) bool {
+	switch val := v.(type) {
+	case bool:
+		return val
+	case string:
+		return val == "true"
+	case int:
+		return val != 0
+	case float64:
+		return val != 0
+	default:
+		return false
 	}
 }
