@@ -53,6 +53,8 @@ type ServiceOptionsModel struct {
 	SkipEncodingExt        basetypes.ObjectValue    `tfsdk:"skip_encoding_ext"`
 	Redirect               basetypes.ObjectValue    `tfsdk:"redirect"`
 	BWThrottle             basetypes.ObjectValue    `tfsdk:"bw_throttle"`
+	ExpiryHeaders          types.List               `tfsdk:"expiry_headers"`
+	SkipPserveExt          basetypes.ObjectValue    `tfsdk:"skip_pserve_ext"`
 }
 
 // ReverseProxyConfigModel represents reverse proxy configuration
@@ -67,25 +69,21 @@ type ReverseProxyConfigModel struct {
 	Mode              types.String `tfsdk:"mode"`
 }
 
-// OptionModel represents an option with enabled/value structure for Terraform
 type OptionModel struct {
 	Enabled types.Bool  `tfsdk:"enabled"`
 	Value   types.Int64 `tfsdk:"value"`
 }
 
-// OptionArrayModel represents an option with enabled/array value structure
 type OptionArrayModel struct {
 	Enabled types.Bool `tfsdk:"enabled"`
 	Value   types.List `tfsdk:"value"`
 }
 
-// OptionStringModel represents an option with enabled/string value structure
 type OptionStringModel struct {
 	Enabled types.Bool   `tfsdk:"enabled"`
 	Value   types.String `tfsdk:"value"`
 }
 
-// HTTPMethodsModel represents the HTTP methods configuration
 type HTTPMethodsModel struct {
 	GET     types.Bool `tfsdk:"get"`
 	HEAD    types.Bool `tfsdk:"head"`
@@ -96,7 +94,18 @@ type HTTPMethodsModel struct {
 	DELETE  types.Bool `tfsdk:"delete"`
 }
 
-// OptionHTTPMethodsModel represents an option with enabled/http methods value structure
+type ExpiryHeaderModel struct {
+	Path       types.String `tfsdk:"path"`
+	Extension  types.String `tfsdk:"extension"`
+	ExpiryTime types.Int64  `tfsdk:"expiry_time"`
+}
+
+type ProtectServeKeyConfig struct {
+	Enabled    types.Bool   `tfsdk:"enabled"`
+	Key        types.String `tfsdk:"key"`
+	Regenerate types.Bool   `tfsdk:"regenerate"`
+}
+
 type OptionHTTPMethodsModel struct {
 	Enabled types.Bool   `tfsdk:"enabled"`
 	Value   types.Object `tfsdk:"value"`
@@ -611,13 +620,53 @@ func (m *ServiceOptionsModel) ToSDKServiceOptions(ctx context.Context) *api.Serv
 		}
 	}
 
+	// Handle ExpiryHeaders
+	var expiryHeaders []api.ExpiryHeader
+	if !m.ExpiryHeaders.IsNull() && !m.ExpiryHeaders.IsUnknown() {
+		var headers []ExpiryHeaderModel
+		diags := m.ExpiryHeaders.ElementsAs(ctx, &headers, false)
+		if !diags.HasError() {
+			for _, header := range headers {
+				expiryHeaders = append(expiryHeaders, api.ExpiryHeader{
+					Path:       header.Path.ValueString(),
+					Extension:  header.Extension.ValueString(),
+					ExpiryTime: int(header.ExpiryTime.ValueInt64()),
+				})
+			}
+		}
+	}
+	opts.ExpiryHeaders = expiryHeaders
+
+	// Handle SkipPserveExt option
+	skipPserveExt, _ := getOptionArrayFromObjectValue(ctx, m.SkipPserveExt)
+	if skipPserveExt != nil && skipPserveExt.Enabled.ValueBool() {
+		// Convert types.List to slice for API
+		var valueSlice []interface{}
+		if !skipPserveExt.Value.IsNull() && !skipPserveExt.Value.IsUnknown() {
+			elements := skipPserveExt.Value.Elements()
+			for _, element := range elements {
+				if strVal, ok := element.(types.String); ok {
+					valueSlice = append(valueSlice, strVal.ValueString())
+				}
+			}
+		}
+
+		opts.SkipPserveExt = api.Option{
+			Enabled: true,
+			Value:   valueSlice,
+		}
+	} else {
+		opts.SkipPserveExt = api.Option{
+			Enabled: false,
+			Value:   []interface{}{}, // Empty array as default
+		}
+	}
+
 	// Initialize required arrays
 	opts.MimeTypesOverrides = make([]api.MimeTypeOverride, 0)
-	opts.ExpiryHeaders = make([]api.ExpiryHeader, 0)
 
 	// Initialize all remaining Option fields with defaults
 	opts.RawLogs = api.Option{Enabled: false, Value: ""}
-	opts.SkipPserveExt = api.Option{Enabled: false, Value: ""}
 	opts.BWThrottleQuery = api.Option{Enabled: false, Value: ""}
 	opts.Slice = api.Option{Enabled: false, Value: ""}
 
@@ -1066,6 +1115,64 @@ func (m *ServiceOptionsModel) FromSDKServiceOptions(ctx context.Context, opts *a
 		"enabled": types.BoolType,
 		"value":   types.Int64Type,
 	}, bwThrottleOption)
+
+	// Convert ExpiryHeaders
+	var expiryHeaders []ExpiryHeaderModel
+	for _, header := range opts.ExpiryHeaders {
+		expiryHeaders = append(expiryHeaders, ExpiryHeaderModel{
+			Path:       types.StringValue(header.Path),
+			Extension:  types.StringValue(header.Extension),
+			ExpiryTime: types.Int64Value(int64(header.ExpiryTime)),
+		})
+	}
+
+	m.ExpiryHeaders, _ = types.ListValueFrom(ctx, types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"path":        types.StringType,
+			"extension":   types.StringType,
+			"expiry_time": types.Int64Type,
+		},
+	}, expiryHeaders)
+
+	// Convert SkipPserveExt option
+	skipPserveExtOption := &OptionArrayModel{
+		Enabled: types.BoolValue(opts.SkipPserveExt.Enabled),
+		Value:   types.ListNull(types.StringType), // Default empty list
+	}
+
+	// Handle the SkipPserveExt value (array)
+	if opts.SkipPserveExt.Value != nil {
+		switch v := opts.SkipPserveExt.Value.(type) {
+		case []interface{}:
+			// Convert slice to types.List
+			var stringValues []attr.Value
+			for _, item := range v {
+				if str, ok := item.(string); ok {
+					stringValues = append(stringValues, types.StringValue(str))
+				}
+			}
+			if len(stringValues) > 0 {
+				skipPserveExtOption.Value, _ = types.ListValue(types.StringType, stringValues)
+			}
+		case []string:
+			// Handle direct string slice
+			var stringValues []attr.Value
+			for _, str := range v {
+				stringValues = append(stringValues, types.StringValue(str))
+			}
+			if len(stringValues) > 0 {
+				skipPserveExtOption.Value, _ = types.ListValue(types.StringType, stringValues)
+			}
+		default:
+			// Keep as empty list for unknown types
+			skipPserveExtOption.Value = types.ListNull(types.StringType)
+		}
+	}
+
+	m.SkipPserveExt, _ = types.ObjectValueFrom(ctx, map[string]attr.Type{
+		"enabled": types.BoolType,
+		"value":   types.ListType{ElemType: types.StringType},
+	}, skipPserveExtOption)
 }
 
 // getBoolFromInterface safely converts interface{} to bool

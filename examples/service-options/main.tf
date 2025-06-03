@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "cachefly" {
-  api_token = ""
+  api_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjQ0NDMxLCJ1c2VyIjoiNjgxYjNjZmIyNzE1MzEwMDM1Y2I3MmI2IiwidG9rZW4iOiI2ODNkYWI5NDc4M2NmOTAwNDA1ZDY3OTciLCJpYXQiOjE3NDg4NzQ1MDd9.BfqNO3YEepe4T44GJPV2PZ-EZcz7B-loE6QVBWMDZaY"
 }
 
 # Data source to fetch an existing service
@@ -24,12 +24,7 @@ resource "cachefly_service_options" "minimal" {
   cors                     = true
   brotli_compression      = true
   brotli_support          = true
-  serve_stale             = true
   
-  # Basic caching options
-  cache_by_geo_country    = false
-  cache_by_region         = false
-  normalize_query_string  = true
   
   # Request handling
   allow_retry             = true
@@ -117,6 +112,32 @@ resource "cachefly_service_options" "minimal" {
     enabled = true
     value   = 70656
   }
+
+  # Service Caching Options
+
+  nocache                   = true
+  cache_by_geo_country      = true
+  cache_by_region           = true
+  normalize_query_string    = true
+  serve_stale               = true
+  cache_by_referer          = true
+
+  expiry_headers = [
+    {
+      path        = "/yellow"
+      extension   = "test"
+      expiry_time = 5
+    }
+  ]
+
+  # Service Security Options
+
+  skip_pserve_ext = {
+    enabled = true
+    value   = ["jpg", "png", "gif", "mp4", "pdf"]
+  }
+
+  protect_serve_key_enabled       = false
     
   # Reverse proxy configuration
   reverse_proxy = {

@@ -412,6 +412,43 @@ func (r *ServiceOptionsResource) Schema(ctx context.Context, req resource.Schema
 					},
 				},
 			},
+			"expiry_headers": schema.ListNestedAttribute{
+				Description: "Expiry headers configuration",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"path": schema.StringAttribute{
+							Description: "Path for the expiry header rule",
+							Required:    true,
+						},
+						"extension": schema.StringAttribute{
+							Description: "File extension for the expiry header rule",
+							Required:    true,
+						},
+						"expiry_time": schema.Int64Attribute{
+							Description: "Expiry time in seconds",
+							Required:    true,
+						},
+					},
+				},
+			},
+			"skip_pserve_ext": schema.SingleNestedAttribute{
+				Description: "Skip pserve for specified file extensions",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						Description: "Enable skip pserve extensions",
+						Optional:    true,
+						Computed:    true,
+					},
+					"value": schema.ListAttribute{
+						Description: "List of file extensions to skip pserve",
+						ElementType: types.StringType,
+						Optional:    true,
+						Computed:    true,
+					},
+				},
+			},
 			"http_methods": schema.SingleNestedAttribute{
 				Description: "HTTP methods configuration",
 				Optional:    true,
