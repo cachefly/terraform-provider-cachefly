@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "cachefly" {
-  api_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjQ0NDMxLCJ1c2VyIjoiNjgxYjNjZmIyNzE1MzEwMDM1Y2I3MmI2IiwidG9rZW4iOiI2ODNkYWI5NDc4M2NmOTAwNDA1ZDY3OTciLCJpYXQiOjE3NDg4NzQ1MDd9.BfqNO3YEepe4T44GJPV2PZ-EZcz7B-loE6QVBWMDZaY"
+  api_token = ""
 }
 
 # Data source to fetch an existing service
