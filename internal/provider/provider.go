@@ -13,8 +13,8 @@ import (
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 
-	"github.com/avvvet/terraform-provider-cachefly/internal/provider/datasources"
-	"github.com/avvvet/terraform-provider-cachefly/internal/provider/resources"
+	"github.com/cachefly/terraform-provider-cachefly/internal/provider/datasources"
+	"github.com/cachefly/terraform-provider-cachefly/internal/provider/resources"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.

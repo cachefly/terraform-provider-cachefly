@@ -8,7 +8,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/avvvet/terraform-provider-cachefly/internal/provider"
+	"github.com/cachefly/terraform-provider-cachefly/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
@@ -23,7 +23,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "cachefly.com/avvvet/cachefly",
+		Address: "cachefly.com/avvvet/cachefly" # todo: cachefly/cachefly,
 		Debug:   debug,
 	}
 

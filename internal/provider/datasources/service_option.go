@@ -8,8 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/avvvet/terraform-provider-cachefly/internal/provider/models"
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
+	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
 
 var _ datasource.DataSource = &ServiceOptionsDataSource{}

@@ -18,7 +18,7 @@ import (
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
 
-	"github.com/avvvet/terraform-provider-cachefly/internal/provider/models"
+	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
 
 // satisfy framework interfaces.

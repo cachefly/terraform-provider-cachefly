@@ -1,4 +1,4 @@
-module github.com/avvvet/terraform-provider-cachefly
+module github.com/cachefly/terraform-provider-cachefly
 
 replace github.com/cachefly/cachefly-go-sdk => /var/repo/clients/cachefly/cachefly-go-sdk
 
