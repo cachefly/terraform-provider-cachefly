@@ -113,9 +113,12 @@ resource "cachefly_service_options" "minimal" {
     value   = 70656
   }
 
-  # Service Caching Options
 
-  nocache                   = true
+  # ===================================================================
+  # SERVICE - Caching Options configurations
+  # ===================================================================
+
+  nocache                   = false
   cache_by_geo_country      = true
   cache_by_region           = true
   normalize_query_string    = true
@@ -130,16 +133,22 @@ resource "cachefly_service_options" "minimal" {
     }
   ]
 
-  # Service Security Options
+  
+  # ===================================================================
+  # SERVICE - Security Options configurations
+  # ===================================================================
 
   skip_pserve_ext = {
     enabled = true
-    value   = ["jpg", "png", "gif", "mp4", "pdf"]
+    value   = ["pm", "key", "cert", "mp4", "pdf"]
   }
 
-  protect_serve_key_enabled       = true
+  protect_serve_key_enabled       = false
     
-  # Reverse proxy configuration
+  
+  # ===================================================================
+  # SERVICE - Reverse proxy configuration
+  # ===================================================================
   reverse_proxy = {
     enabled               = true
     hostname              = "backend.example.com"

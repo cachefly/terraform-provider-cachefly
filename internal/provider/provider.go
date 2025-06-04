@@ -51,72 +51,7 @@ func (p *CacheFlyProvider) Metadata(ctx context.Context, req provider.MetadataRe
 
 func (p *CacheFlyProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: `
-# CacheFly Terraform Provider
-
-The CacheFly provider allows you to manage CacheFly CDN resources using Terraform.
-
-Use the CacheFly provider to manage services, accounts, users, and other CDN configurations.
-
-## Authentication
-
-The provider requires an API token to authenticate with the CacheFly API. 
-
-### API Token
-
-You can provide the API token in several ways:
-
-1. **Provider configuration** (recommended for development):
-` + "```hcl" + `
-provider "cachefly" {
-  api_token = "your-api-token-here"
-}
-` + "```" + `
-
-2. **Environment variable** (recommended for production):
-` + "```bash" + `
-export CACHEFLY_API_TOKEN="your-api-token-here"
-` + "```" + `
-
-3. **Terraform variables**:
-` + "```hcl" + `
-variable "cachefly_api_token" {
-  description = "CacheFly API Token"
-  type        = string
-  sensitive   = true
-}
-
-provider "cachefly" {
-  api_token = var.cachefly_api_token
-}
-` + "```" + `
-
-## Example Usage
-
-` + "```hcl" + `
-terraform {
-  required_providers {
-    cachefly = {
-      source  = "cachefly/cachefly"
-      version = "~> 1.0"
-    }
-  }
-}
-
-# Configure the CacheFly Provider
-provider "cachefly" {
-  api_token = var.cachefly_api_token
-}
-
-# Create a service
-resource "cachefly_service" "example" {
-  name        = "my-cdn-service"
-  unique_name = "my-unique-service"
-  description = "Example CDN service"
-  auto_ssl    = true
-}
-` + "```" + `
-		`,
+		MarkdownDescription: "The CacheFly provider allows you to manage CacheFly CDN resources using Terraform.",
 		Attributes: map[string]schema.Attribute{
 			"api_token": schema.StringAttribute{
 				MarkdownDescription: "The API token for authenticating with CacheFly. Can also be set with the `CACHEFLY_API_TOKEN` environment variable.",
@@ -186,23 +121,23 @@ func (p *CacheFlyProvider) Configure(ctx context.Context, req provider.Configure
 
 func (p *CacheFlyProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		// Service resources
 		resources.NewServiceResource,
 		resources.NewServiceDomainResource,
 		resources.NewOriginResource,
 		resources.NewServiceOptionsResource,
+		resources.NewUserResource,
 	}
 }
 
 func (p *CacheFlyProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-
 		datasources.NewServiceDataSource,
 		datasources.NewServiceDomainDataSource,
 		datasources.NewServiceDomainsDataSource,
 		datasources.NewOriginDataSource,
 		datasources.NewOriginsDataSource,
 		datasources.NewServiceOptionsDataSource,
+		datasources.NewUsersDataSource,
 	}
 }
 
