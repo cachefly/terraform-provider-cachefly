@@ -137,7 +137,7 @@ resource "cachefly_service_options" "minimal" {
     value   = ["jpg", "png", "gif", "mp4", "pdf"]
   }
 
-  protect_serve_key_enabled       = false
+  protect_serve_key_enabled       = true
     
   # Reverse proxy configuration
   reverse_proxy = {

@@ -587,13 +587,12 @@ func (r *ServiceOptionsResource) Create(ctx context.Context, req resource.Create
 	}
 
 	serviceID := data.ServiceID.ValueString()
+
 	tflog.Debug(ctx, "Creating service options", map[string]interface{}{
 		"service_id": serviceID,
 	})
 
 	// Convert to SDK model
-	//opts := data.ToSDKServiceOptions()
-
 	opts := data.ToSDKServiceOptions(ctx)
 
 	// Create/Update service options via API
@@ -604,6 +603,34 @@ func (r *ServiceOptionsResource) Create(ctx context.Context, req resource.Create
 			"Could not create service options, unexpected error: "+err.Error(),
 		)
 		return
+	}
+
+	// Handle protect serve key if requested to be enabled
+	if data.ProtectServeKeyEnabled.ValueBool() {
+		tflog.Debug(ctx, "Enabling protect serve key during create", map[string]interface{}{
+			"service_id": serviceID,
+		})
+
+		_, err := r.client.ServiceOptions.RecreateProtectServeKey(ctx, serviceID, "")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error enabling ProtectServe key during create",
+				"Could not enable ProtectServe key: "+err.Error(),
+			)
+			return
+		}
+
+		// Re-read the options to get the updated state after enabling protect serve
+		updatedOpts, err = r.client.ServiceOptions.GetBasicOptions(ctx, serviceID)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading service options after enabling protect serve",
+				"Could not read service options: "+err.Error(),
+			)
+			return
+		}
+
+		tflog.Debug(ctx, "Protect serve key enabled successfully during create")
 	}
 
 	// Convert response back to model
@@ -647,21 +674,22 @@ func (r *ServiceOptionsResource) Read(ctx context.Context, req resource.ReadRequ
 
 func (r *ServiceOptionsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.ServiceOptionsModel
+	var state models.ServiceOptionsModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	serviceID := data.ServiceID.ValueString()
-	tflog.Debug(ctx, "Updating service options", map[string]interface{}{
-		"service_id": serviceID,
-	})
+	currentEnabled := state.ProtectServeKeyEnabled.ValueBool()
+	requestedEnabled := data.ProtectServeKeyEnabled.ValueBool()
 
 	// Convert to SDK model
 	opts := data.ToSDKServiceOptions(ctx)
 
-	// Update service options via API
+	// Update service options via API first
 	updatedOpts, err := r.client.ServiceOptions.SaveBasicOptions(ctx, serviceID, *opts)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -669,6 +697,41 @@ func (r *ServiceOptionsResource) Update(ctx context.Context, req resource.Update
 			"Could not update service options, unexpected error: "+err.Error(),
 		)
 		return
+	}
+
+	// Handle protect serve key changes
+	if currentEnabled != requestedEnabled {
+		if requestedEnabled {
+			// Enabling protect serve key (false -> true)
+			_, err := r.client.ServiceOptions.RecreateProtectServeKey(ctx, serviceID, "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error enabling ProtectServe key",
+					"Could not enable ProtectServe key: "+err.Error(),
+				)
+				return
+			}
+		} else {
+			// Disabling protect serve key (true -> false)
+			err := r.client.ServiceOptions.DeleteProtectServeKey(ctx, serviceID)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error disabling ProtectServe key",
+					"Could not disable ProtectServe key: "+err.Error(),
+				)
+				return
+			}
+		}
+
+		// Re-read the options to get the updated state
+		updatedOpts, err = r.client.ServiceOptions.GetBasicOptions(ctx, serviceID)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading updated service options",
+				"Could not read service options after protect serve change: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Convert response back to model
@@ -686,9 +749,28 @@ func (r *ServiceOptionsResource) Delete(ctx context.Context, req resource.Delete
 	}
 
 	serviceID := data.ServiceID.ValueString()
+
 	tflog.Debug(ctx, "Deleting service options (resetting to defaults)", map[string]interface{}{
 		"service_id": serviceID,
 	})
+
+	// First, disable protect serve key if it's enabled
+	if data.ProtectServeKeyEnabled.ValueBool() {
+		tflog.Debug(ctx, "Disabling protect serve key before reset", map[string]interface{}{
+			"service_id": serviceID,
+		})
+
+		err := r.client.ServiceOptions.DeleteProtectServeKey(ctx, serviceID)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error disabling ProtectServe key during delete",
+				"Could not disable ProtectServe key: "+err.Error(),
+			)
+			return
+		}
+
+		tflog.Debug(ctx, "Protect serve key disabled successfully")
+	}
 
 	// Reset service options to defaults
 	defaultOpts := api.ServiceOptions{
