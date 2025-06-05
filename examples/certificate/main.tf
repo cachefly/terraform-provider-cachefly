@@ -20,14 +20,13 @@ provider "cachefly" {
 resource "cachefly_certificate" "web-east-2" {
   certificate = <<-EOT
 -----BEGIN CERTIFICATE-----
-MIIDjTCCAxOgAwIBAgISBnT/I/7K68WFPfoulTHn8uPjMAoGCCqGSM49BAMDMDIx
-Fg==
+
 -----END CERTIFICATE-----
   EOT
 
   certificate_key = <<-EOT
 -----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgV5NnlUadOM1q1fEm
+
 -----END PRIVATE KEY-----
   EOT
 }
