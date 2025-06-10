@@ -259,6 +259,117 @@ func (r *ServiceOptionsResource) Update(ctx context.Context, req resource.Update
 
 func (r *ServiceOptionsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data models.ServiceOptionsModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	serviceID := data.ServiceID.ValueString()
+	tflog.Debug(ctx, "Deleting service options (resetting to defaults)", map[string]interface{}{
+		"service_id": serviceID,
+	})
+
+	// Get the current options from the API to see what's actually set
+	currentOpts, err := r.client.ServiceOptions.GetOptions(ctx, serviceID)
+	if err != nil {
+		tflog.Warn(ctx, "Could not read current options before delete", map[string]interface{}{
+			"service_id": serviceID,
+			"error":      err.Error(),
+		})
+		return
+	}
+
+	tflog.Debug(ctx, "Current options to potentially reset", map[string]interface{}{
+		"current_options": currentOpts,
+	})
+
+	// Reset options in groups to avoid validation conflicts
+	resetGroups := []map[string]interface{}{
+		// Group 1: Security keys (reset these first)
+		{
+			"protectServeKeyEnabled": false,
+			"apiKeyEnabled":          false,
+		},
+
+		// Group 2: Simple boolean options
+		{},
+
+		// Group 3: Complex objects with enabled/value structure
+		{},
+
+		// Group 4: Arrays
+		{
+			"expiryHeaders": []interface{}{},
+		},
+	}
+
+	// Build Group 2: Simple boolean options (only if they exist in current options)
+	booleanOptions := []string{
+		"nocache", "allowretry", "servestale", "normalizequerystring",
+		"forceorigqstring", "cors", "autoRedirect", "livestreaming",
+		"linkpreheat", "purgenoquery", "cachebygeocountry", "cachebyreferer",
+		"cachebyregion", "send-xff", "brotli_support", "use_slicer",
+	}
+
+	for _, option := range booleanOptions {
+		if _, exists := currentOpts[option]; exists {
+			resetGroups[1][option] = false
+		}
+	}
+
+	// Build Group 3: Complex objects (only if they exist in current options)
+	complexOptions := []string{
+		"reverseProxy", "error_ttl", "ttfb_timeout", "contimeout", "maxcons",
+		"bwthrottle", "sharedshield", "originhostheader", "purgemode",
+		"dirpurgeskip", "httpmethods", "skip_pserve_ext", "skip_encoding_ext",
+		"redirect",
+	}
+
+	for _, option := range complexOptions {
+		if _, exists := currentOpts[option]; exists {
+			resetGroups[2][option] = map[string]interface{}{
+				"enabled": false,
+			}
+		}
+	}
+
+	// Apply resets in groups
+	for i, resetGroup := range resetGroups {
+		if len(resetGroup) == 0 {
+			continue
+		}
+
+		tflog.Debug(ctx, "Applying reset group", map[string]interface{}{
+			"group":   i + 1,
+			"options": resetGroup,
+		})
+
+		_, err := r.client.ServiceOptions.UpdateOptions(ctx, serviceID, resetGroup)
+		if err != nil {
+			tflog.Warn(ctx, "Reset group failed, trying individual options", map[string]interface{}{
+				"group": i + 1,
+				"error": err.Error(),
+			})
+
+			// Try individual options in this group
+			for optName, optValue := range resetGroup {
+				individualReset := api.ServiceOptions{optName: optValue}
+				_, err := r.client.ServiceOptions.UpdateOptions(ctx, serviceID, individualReset)
+				if err != nil {
+					tflog.Warn(ctx, "Failed to reset individual option", map[string]interface{}{
+						"option": optName,
+						"error":  err.Error(),
+					})
+				}
+			}
+		}
+	}
+
+	tflog.Debug(ctx, "Service options reset completed")
+}
+
+func (r *ServiceOptionsResource) DeleteOptional(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data models.ServiceOptionsModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -305,12 +416,12 @@ func (r *ServiceOptionsResource) Delete(ctx context.Context, req resource.Delete
 			}
 		}
 
-		// Check other complex options and reset them
+		// Check other complex options and reset them (todo: (awet) need to be dynamic, use metadata or allowed options)
 		featureOptions := []string{
-			"rawLogs", "error_ttl", "ttfb_timeout", "contimeout", "maxcons",
+			"error_ttl", "ttfb_timeout", "contimeout", "maxcons",
 			"bwthrottle", "sharedshield", "originhostheader", "purgemode",
 			"dirpurgeskip", "httpmethods", "skip_pserve_ext", "skip_encoding_ext",
-			"redirect", "slice", "bwthrottlequery",
+			"redirect",
 		}
 
 		resetOpts := make(api.ServiceOptions)
