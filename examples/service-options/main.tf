@@ -2,13 +2,13 @@ terraform {
   required_version = ">= 1.0"
   required_providers {
     cachefly = {
-      source = "cachefly.com/avvvet/cachefly" # todo: cachefly/cachefly
+      source = "cachefly.com/avvvet/cachefly"
     }
   }
 }
 
 provider "cachefly" {
-  api_token = ""
+  api_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjQ0NDMxLCJ1c2VyIjoiNjgxYjNjZmIyNzE1MzEwMDM1Y2I3MmI2IiwidG9rZW4iOiI2ODNkYWI5NDc4M2NmOTAwNDA1ZDY3OTciLCJpYXQiOjE3NDg4NzQ1MDd9.BfqNO3YEepe4T44GJPV2PZ-EZcz7B-loE6QVBWMDZaY"
 }
 
 # Data source to fetch an existing service
@@ -16,180 +16,118 @@ data "cachefly_service" "example" {
   id = "681b3dc52715310035cb75d4"
 }
 
-# Enhanced service options with reverse proxy
-resource "cachefly_service_options" "minimal" {
+resource "cachefly_service_options" "advanced_options" {
   service_id = data.cachefly_service.example.id
   
-  # Basic boolean options
-  cors                     = true
-  brotli_compression      = true
-  brotli_support          = true
-  
-  
-  # Request handling
-  allow_retry             = true
-  follow_redirect         = false
-  send_xff                = true
+  options = {
+    nocache              = false
+    allowretry           = true
+    servestale           = true
+    normalizequerystring = true
+    forceorigqstring     = false
 
-  force_orig_qstring      = true
+    reverseProxy = {
+      enabled           = true
+      mode              = "WEB"
+      hostname          = "www.example.com"
+      cacheByQueryParam = true
+      originScheme      = "FOLLOW"
+      ttl               = 2678400
+      useRobotsTxt      = true
+    }
 
-  # API defaults
-  ftp                     = true  
-  api_key_enabled         = true 
-  
-  error_ttl = {
-    enabled               = true
-    value                 = 400
-  }
+    rawLogs = {
+      enabled     = true
+      logFormat   = "combined"
+      compression = "gzip"
+    }
 
-  con_timeout = {
-    enabled               = true
-    value                 = 5
-  }
+    error_ttl = {
+      enabled = true
+      value   = 700
+    }
 
-  max_cons = {
-    enabled               = true
-    value                 = 700
-  }
+    ttfb_timeout = {
+      enabled = true
+      value   = 30
+    }
 
-  ttfb_timeout = {
-    enabled               = true
-    value                 = 7
-  }
+    contimeout = {
+      enabled = true
+      value   = 10
+    }
 
-  shared_shield = {
-    enabled = true
-    value   = "IAD"  # Value must be one of: IAD, ORD, FRA, VIE
-  }
+    maxcons = {
+      enabled = true
+      value   = 100
+    }
 
-  origin_hostheader = {
-    enabled = true
-    value   = ["example.com", "api.example.com"]
-  }
+    bwthrottle = {
+      enabled = true
+      value   = 1000000
+    }
 
-  purge_no_query          = true
+    sharedshield = {
+      enabled = true
+      value   = "ORD"
+    }
 
-  purge_mode = {
-    enabled = true
-    value   = "2"   // value is index for DISABLED EXACT DIRECTORY EXACT_DIRECTORY EXTENSTION 
-  }
+    purgemode = {
+      enabled = true
+      value   = "2"
+    }
 
-  dir_purge_skip = {
-    enabled = true
-    value   = 0  
-  }
+    redirect = {
+      enabled = true
+      value   = "https://www.newdomain.com/"
+    }
 
-  # Service Delivery configuration options
+    slice = {
+      enabled = true
+      value   = true
+    }
 
-  http_methods = {
-    enabled = true
-    value = {
-      get     = true
-      head    = true
-      options = true
-      put     = false
-      post    = false
-      patch   = false
-      delete  = true
+    originhostheader = {
+      enabled = true
+      value   = ["origin.example.com", "backup.example.com"]
+    }
+
+    skip_pserve_ext = {
+      enabled = true
+      value   = [".jpg", ".png", ".gif", ".css", ".js"]
+    }
+
+    skip_encoding_ext = {
+      enabled = true
+      value   = [".zip", ".gz", ".tar", ".rar"]
+    }
+
+    bwthrottlequery = {
+      enabled = true
+      value   = ["limit", "throttle"]
+    }
+
+    dirpurgeskip = {
+      enabled = true
+      value   = 1
+    }
+
+    httpmethods = {
+      enabled = true
+      value = {
+        GET     = true
+        POST    = true
+        PUT     = false
+        DELETE  = false
+        HEAD    = true
+        OPTIONS = true
+        PATCH   = false
+      }
     }
   }
-
-  skip_encoding_ext = {
-    enabled = true
-    value   = ["jpg", "png", "gif", "mp4", "pdf"]
-  }
-
-  livestreaming             = true
-  link_preheat              = true
-  auto_redirect             = true
-
-  redirect = {
-    enabled = true
-    value   = "https://www.yellow.com/"
-  }
-
-  bw_throttle = {
-    enabled = true
-    value   = 70656
-  }
-
-
-  # ===================================================================
-  # SERVICE - Caching Options configurations
-  # ===================================================================
-
-  nocache                   = false
-  cache_by_geo_country      = true
-  cache_by_region           = true
-  normalize_query_string    = true
-  serve_stale               = true
-  cache_by_referer          = true
-
-  expiry_headers = [
-    {
-      path        = "/yellow"
-      extension   = "test"
-      expiry_time = 5
-    }
-  ]
-
-  
-  # ===================================================================
-  # SERVICE - Security Options configurations
-  # ===================================================================
-
-  skip_pserve_ext = {
-    enabled = true
-    value   = ["pm", "key", "cert", "mp4", "pdf"]
-  }
-
-  protect_serve_key_enabled       = false
-    
-  
-  # ===================================================================
-  # SERVICE - Reverse proxy configuration
-  # ===================================================================
-  reverse_proxy = {
-    enabled               = true
-    hostname              = "backend.example.com"
-    prepend               = "/api/v1"
-    ttl                   = 3600
-    cache_by_query_param  = true
-    origin_scheme         = "FOLLOW"
-    use_robots_txt        = true
-    mode                  = "WEB"
-  }
 }
 
-# Output the configured options
-output "configured_options" {
-  value = {
-    # Basic options
-    cors_enabled = cachefly_service_options.minimal.cors
-    brotli_enabled = cachefly_service_options.minimal.brotli_compression
-    serve_stale_enabled = cachefly_service_options.minimal.serve_stale
-    normalize_query_string = cachefly_service_options.minimal.normalize_query_string
-    
-    # Reverse proxy info
-    reverse_proxy_enabled = cachefly_service_options.minimal.reverse_proxy.enabled
-    reverse_proxy_hostname = cachefly_service_options.minimal.reverse_proxy.hostname
-    reverse_proxy_scheme = cachefly_service_options.minimal.reverse_proxy.origin_scheme
-    
-  }
+# Outputs
+output "advanced_options" {
+  value = cachefly_service_options.advanced_options.options
 }
-
-# Output reverse proxy details
-output "reverse_proxy_config" {
-  value = cachefly_service_options.minimal.reverse_proxy
-}
-
-# Origin Error TTL
-output "origin_error_ttl_option" {
-  value = cachefly_service_options.minimal.error_ttl
-}
-
-# Origin ConTimeout
-output "connection_timeout_option" {
-  value = cachefly_service_options.minimal.con_timeout
-}
-   

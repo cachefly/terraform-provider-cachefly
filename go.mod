@@ -4,10 +4,7 @@ replace github.com/cachefly/cachefly-go-sdk => /var/repo/clients/cachefly/cachef
 
 go 1.23.7
 
-require (
-	github.com/hashicorp/terraform-plugin-framework v1.14.1
-	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
-)
+require github.com/hashicorp/terraform-plugin-framework v1.14.1
 
 require (
 	github.com/cachefly/cachefly-go-sdk v0.0.0
@@ -18,6 +15,7 @@ require (
 require (
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-plugin v1.6.2 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect

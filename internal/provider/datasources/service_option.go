@@ -478,8 +478,8 @@ func (d *ServiceOptionsDataSource) Read(ctx context.Context, req datasource.Read
 		"service_id": serviceID,
 	})
 
-	// Get service options from API
-	serviceOptions, err := d.client.ServiceOptions.GetBasicOptions(ctx, serviceID)
+	// Get service options from new API
+	serviceOptions, err := d.client.ServiceOptions.GetOptions(ctx, serviceID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading service options",
@@ -488,11 +488,18 @@ func (d *ServiceOptionsDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	// Convert SDK model to Terraform model
-	data.FromSDKServiceOptions(ctx, serviceOptions)
+	// Convert API response to Terraform model using the new method
+	if err := data.FromAPIServiceOptions(serviceID, serviceOptions); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Converting API Response",
+			fmt.Sprintf("Could not convert API response to Terraform model for service %s: %s", serviceID, err),
+		)
+		return
+	}
 
 	tflog.Debug(ctx, "Successfully read service options", map[string]interface{}{
-		"service_id": serviceID,
+		"service_id":    serviceID,
+		"options_count": len(serviceOptions),
 	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
