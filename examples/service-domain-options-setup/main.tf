@@ -1,5 +1,7 @@
-# Complete CacheFly CDN Service Setup Example
-# This example creates a full CDN service with domain and advanced options
+# ===================================================================
+# CacheFly CDN - This example creates a full CDN service with domain and advanced options
+# 
+# ===================================================================
 
 terraform {
   required_providers {

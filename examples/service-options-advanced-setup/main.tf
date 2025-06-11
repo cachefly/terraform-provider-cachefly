@@ -1,5 +1,5 @@
 # ===================================================================
-# CacheFly Service Options Configuration
+# CacheFly CDN Advanced Service Options Configuration
 # ===================================================================
 
 terraform {

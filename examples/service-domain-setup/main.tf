@@ -1,5 +1,7 @@
-# CacheFly Provider - Complete Setup Example
-# This example shows services with custom domains - a real-world setup
+# ===================================================================
+# CacheFly CDN - example demonstrating multiple CDN services and domain
+# 
+# ===================================================================
 
 terraform {
   required_version = ">= 1.0"

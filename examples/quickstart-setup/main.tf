@@ -1,5 +1,7 @@
-# CacheFly Terraform Provider - Quickstart
-# Get started with CacheFly in under 5 minutes
+# ===================================================================
+# CacheFly CDN - example demonstrating  Quickstart CDN service
+# 
+# ===================================================================
 
 terraform {
   required_version = ">= 1.0"
