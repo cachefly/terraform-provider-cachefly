@@ -58,27 +58,53 @@ output "services" {
 
 Explore comprehensive examples to help you get started:
 
-- **[Complete Setup](./examples/complete-setup/main.tf)** - Full configuration with service creation and management
-- **[Origins Configuration](./examples/origins/main.tf)** - Setting up origin servers and configurations  
-- **[Quick Start Guide](./examples/quickstart/main.tf)** - Simple examples to get up and running quickly
-- **[Service Options](./examples/service-options/main.tf)** - Advanced service configuration options
+- **[Quick Start Guide](./examples/quickstart-setup/main.tf)** - Simple examples to get up and running quickly
+- **[Origins Configuration](./examples/origins-setup/main.tf)** - Setting up origin servers and configurations  
+- **[CDN Service + Domain Configuration](./examples/service-domain-setup/main.tf)** - Setting up CDN Service and Domains
+
+- **[SSL Certificate Configuration](./examples/certificate-setup/main.tf)** - Example shows how to configure SSL certificate
+- **[Script Configuration](./examples/script-config-setup/main.tf)** - CDN Service advanced script congigrations
+
+- **[Users Setup](./examples/users-setup/main.tf)** - Setting user accounts 
+- **[Service Options](./examples/service-options-advanced-setup/main.tf)** - Advanced service configuration options
+- **[Service, Domain and Options](./examples/service-domain-options-setup/main.tf)** - Full configuration service, domain and options
+
+- **[Comprehensive Setup](./examples/comprehensive-setup/main.tf)** - Full configuration with service creation and management
+
 
 ## Features
-
-- **Service Management** - Create, update, and manage CacheFly services
-- **Origin Configuration** - Configure origin servers and settings
-- **Data Sources** - Query existing services and configurations
+- **Service Management** - Create, update, and manage CacheFly services with auto-SSL
+- **Origin Configuration** - Configure origin servers with timeouts, compression, and caching settings
+- **Custom Domain Management** - Attach custom domains with DNS validation
+- **SSL Certificate Management** - Custom SSL certificates and auto-SSL configuration
+- **Comprehensive Service Options** - 30+ CDN configuration options including:
+ * Caching Control (nocache, servestale, normalizequerystring, purgenoquery)
+ * Performance Optimization (brotli_support, bandwidth throttling, connection limits)
+ * Geographic Caching (by country, region, referer)
+ * Timeout Configurations (TTFB, connection, error TTL, max connections)
+ * Security Features (API keys, serve key protection)
+ * Advanced Features (live streaming, link preheating, CORS, redirects)
+ * File Handling (skip encoding/processing by extension, directory purge control)
+- **Script Configurations** - Automation and custom logic (URL redirects, AWS credentials)
+- **User Management** - Team access control with granular permissions and service assignments
 - **Full API Coverage** - Comprehensive support for CacheFly API v2.5.0
 
 ## Resources and Data Sources
 
 ### Resources
-- `cachefly_service` - Manage CacheFly services
-- `cachefly_origin` - Configure origin servers
+- `cachefly_service` - Manage CacheFly CDN services with auto-SSL and configuration modes
+- `cachefly_origin` - Configure origin servers with timeouts, compression, and caching settings
+- `cachefly_service_domain` - Attach and manage custom domains with DNS validation
+- `cachefly_certificate` - Upload and manage custom SSL certificates
+- `cachefly_service_options` - Configure comprehensive CDN options (30+ settings)
+- `cachefly_script_config` - Manage automation scripts and custom logic configurations
+- `cachefly_user` - Create and manage team users with granular permissions
 
-### Data Sources  
+### Data Sources
 - `cachefly_services` - List and query existing services
 - `cachefly_service` - Get details of a specific service
+- `cachefly_origins` - List and query origin servers by type
+- `cachefly_service_domains` - List domains attached to a specific service
 
 ## Documentation
 
