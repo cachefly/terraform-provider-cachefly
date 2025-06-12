@@ -1,7 +1,5 @@
 module github.com/cachefly/terraform-provider-cachefly
 
-replace github.com/cachefly/cachefly-go-sdk => /var/repo/clients/cachefly/cachefly-go-sdk
-
 go 1.23.7
 
 require github.com/hashicorp/terraform-plugin-framework v1.14.1
@@ -35,3 +33,5 @@ require (
 	google.golang.org/grpc v1.69.4 // indirect
 	google.golang.org/protobuf v1.36.3 // indirect
 )
+
+replace github.com/cachefly/cachefly-go-sdk => github.com/avvvet/cachefly-sdk-go v1.0.2-0.20250610112218-e4243e4315d4
