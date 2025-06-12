@@ -36,19 +36,19 @@ variable "project_name" {
 variable "unique_suffix" {
   description = "Unique suffix to avoid naming conflicts (change for each run)"
   type        = string
-  default     = "v1"  # Change this for each deployment (v1, v2, v3, etc.)
+  default     = "v8"  # Change this for each deployment (v1, v2, v3, etc.)
 }
 
 variable "admin_username" {
   description = "Admin user username (must be unique across all CacheFly)"
   type        = string
-  default     = "admin.user.v1"  # Change this for each deployment
+  default     = "admin.user.v8"  # Change this for each deployment
 }
 
 variable "support_username" {
   description = "Support user username (must be unique across all CacheFly)"
   type        = string
-  default     = "support.user.v1"  # Change this for each deployment
+  default     = "support.user.v8"  # Change this for each deployment
 }
 
 # ===================================================================
@@ -552,15 +552,7 @@ resource "cachefly_user" "support_user" {
 # OUTPUTS - Minimal essential information
 # ===================================================================
 
-output "cdn_endpoints" {
-  description = "Your CDN endpoints"
-  value = {
-    website      = "https://${cachefly_service.website.unique_name}.cachefly.net"
-    api          = "https://${cachefly_service.api.unique_name}.cachefly.net"
-    assets       = "https://${cachefly_service.assets.unique_name}.cachefly.net"
-    main_domain  = var.domain
-  }
-}
+
 
 output "setup_status" {
   description = "Basic setup verification"

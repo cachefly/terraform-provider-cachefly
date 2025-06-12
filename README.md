@@ -114,7 +114,7 @@ For detailed documentation on all resources and data sources, visit the [Terrafo
 
 The following screenshot shows Terraform in action, deploying a new service and retrieving the newly created service:
 
-![Terraform output for CacheFly services](./doc/hcl_output.png)
+![Terraform output for CacheFly services](./hcl_output.png)
 
 ## Requirements
 
