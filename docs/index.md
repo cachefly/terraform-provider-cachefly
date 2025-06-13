@@ -14,8 +14,8 @@ The CacheFly provider is used to interact with CacheFly CDN resources. It provid
 terraform {
   required_providers {
     cachefly = {
-      source  = "cachefly.com/avvvet/cachefly"
-      version = "~> 0.1"
+      source  = "cachefly/cachefly"
+      version = "0.1.0"
     }
   }
 }

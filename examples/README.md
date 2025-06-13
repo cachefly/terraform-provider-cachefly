@@ -35,7 +35,7 @@ export CACHEFLY_API_TOKEN="your-api-token-here"
 terraform {
   required_providers {
     cachefly = {
-      source = "cachefly.com/avvvet/cachefly" # todo: cachefly/cachefly
+      source = "cachefly/cachefly" 
     }
   }
 }
