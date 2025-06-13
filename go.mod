@@ -9,7 +9,7 @@ require (
 )
 
 require (
-	github.com/cachefly/cachefly-go-sdk v0.0.0
+	github.com/cachefly/cachefly-go-sdk v1.0.4
 	github.com/hashicorp/terraform-plugin-go v0.23.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
@@ -68,5 +68,3 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/cachefly/cachefly-go-sdk => github.com/avvvet/cachefly-sdk-go v1.0.2-0.20250610112218-e4243e4315d4
