@@ -23,7 +23,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "cachefly/cachefly", //,
+		Address: "registry.terraform.io/cachefly/cachefly",
 		Debug:   debug,
 	}
 
