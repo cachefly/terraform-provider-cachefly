@@ -48,7 +48,7 @@ signs:
 
 release:
   github:
-    owner: cachefly
+    owner: avvvet
     name: terraform-provider-cachefly
   draft: false
 
