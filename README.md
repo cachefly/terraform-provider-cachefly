@@ -106,9 +106,17 @@ Explore comprehensive examples to help you get started:
 - `cachefly_origins` - List and query origin servers by type
 - `cachefly_service_domains` - List domains attached to a specific service
 
+##  Tests
+   we have unit tests for provider at `./internal/provider/`
+
+```run  tests 
+  go test -v -count=1 ./internal/provider/
+```
+
+
 ## Documentation
 
-For detailed documentation on all resources and data sources, visit the [Terraform Registry documentation](https://registry.terraform.io/providers/cachefly.com/avvvet/cachefly/latest/docs).
+For detailed documentation on all resources and data sources, visit the [Terraform Registry documentation](https://registry.terraform.io/providers/cachefly.com/cachefly/cachefly/latest/docs).
 
 ## Output Example
 
