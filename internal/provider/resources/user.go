@@ -67,7 +67,7 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"full_name": schema.StringAttribute{
 				Description: "Full name of the user.",
-				Required:    true,
+				Optional:    true,
 			},
 			"phone": schema.StringAttribute{
 				Description: "Phone number of the user.",
@@ -142,18 +142,16 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	// Build create request
 	createReq := api.CreateUserRequest{
-		Username: data.Username.ValueString(),
-		Password: data.Password.ValueString(),
-		Email:    data.Email.ValueString(),
-		FullName: data.FullName.ValueString(),
+		Username:               data.Username.ValueString(),
+		Password:               data.Password.ValueString(),
+		PasswordChangeRequired: data.PasswordChangeRequired.ValueBoolPointer(),
+		Email:                  data.Email.ValueString(),
+		FullName:               data.FullName.ValueString(),
 	}
 
 	// Optional fields
 	if !data.Phone.IsNull() && !data.Phone.IsUnknown() {
 		createReq.Phone = data.Phone.ValueString()
-	}
-	if !data.PasswordChangeRequired.IsNull() && !data.PasswordChangeRequired.IsUnknown() {
-		createReq.PasswordChangeRequired = data.PasswordChangeRequired.ValueBool()
 	}
 
 	// Convert Services set to string slice
@@ -260,10 +258,8 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if !data.Phone.IsNull() && !data.Phone.IsUnknown() {
 		updateReq.Phone = data.Phone.ValueString()
 	}
-	if !data.PasswordChangeRequired.IsNull() && !data.PasswordChangeRequired.IsUnknown() {
-		val := data.PasswordChangeRequired.ValueBool()
-		updateReq.PasswordChangeRequired = &val
-	}
+
+	updateReq.PasswordChangeRequired = data.PasswordChangeRequired.ValueBoolPointer()
 
 	// Convert Services set to string slice
 	if !data.Services.IsNull() && !data.Services.IsUnknown() {
@@ -351,7 +347,7 @@ func (r *UserResource) mapUserToState(user *api.User, data *models.UserModel) {
 	data.Username = types.StringValue(user.Username)
 	data.Email = types.StringValue(user.Email)
 	data.FullName = types.StringValue(user.FullName)
-	data.Phone = types.StringValue(user.Phone)
+	data.Phone = types.StringPointerValue(user.Phone)
 	data.Status = types.StringValue(user.Status)
 	data.CreatedAt = types.StringValue(user.CreatedAt)
 	data.UpdatedAt = types.StringValue(user.UpdatedAt)

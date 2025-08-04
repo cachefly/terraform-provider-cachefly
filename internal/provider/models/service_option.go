@@ -11,9 +11,8 @@ import (
 
 // ServiceOptionsModel represents the Terraform resource model for service options
 type ServiceOptionsModel struct {
-	ServiceID   types.String  `tfsdk:"service_id"`
-	Options     types.Dynamic `tfsdk:"options"`
-	LastUpdated types.String  `tfsdk:"last_updated"`
+	ServiceID types.String  `tfsdk:"service_id"`
+	Options   types.Dynamic `tfsdk:"options"`
 }
 
 // OptionPropertyModel represents detailed metadata about an option property for Terraform
@@ -178,166 +177,98 @@ func convertInterfaceToAttrValue(value interface{}) (attr.Value, attr.Type) {
 	}
 }
 
-// ToAPIServiceOptions converts Terraform model to API ServiceOptions
-func (m *ServiceOptionsModel) ToAPIServiceOptions() (api.ServiceOptions, error) {
-	if m.Options.IsNull() || m.Options.IsUnknown() {
-		return api.ServiceOptions{}, nil
-	}
+// // ToAPIServiceOptions converts Terraform model to API ServiceOptions
+// func (m *ServiceOptionsModel) ToAPIServiceOptions() (api.ServiceOptions, error) {
+// 	if m.Options.IsNull() || m.Options.IsUnknown() {
+// 		return api.ServiceOptions{}, nil
+// 	}
 
-	options := make(api.ServiceOptions)
+// 	options := make(api.ServiceOptions)
 
-	// Extract the underlying value from the dynamic type
-	underlyingValue := m.Options.UnderlyingValue()
+// 	// Extract the underlying value from the dynamic type
+// 	underlyingValue := m.Options.UnderlyingValue()
 
-	// The underlying value should be an object
-	if objValue, ok := underlyingValue.(basetypes.ObjectValue); ok {
-		attributes := objValue.Attributes()
+// 	// The underlying value should be an object
+// 	if objValue, ok := underlyingValue.(basetypes.ObjectValue); ok {
+// 		attributes := objValue.Attributes()
 
-		for key, value := range attributes {
-			// Convert terraform types back to interface{}
-			convertedValue, err := convertTerraformValueToInterface(value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert value for key %s: %w", key, err)
-			}
-			if convertedValue != nil {
-				options[key] = convertedValue
-			}
-		}
-	} else {
-		return nil, fmt.Errorf("expected object value, got %T", underlyingValue)
-	}
+// 		for key, value := range attributes {
+// 			// Convert terraform types back to interface{}
+// 			convertedValue, err := convertTerraformValueToInterface(value)
+// 			if err != nil {
+// 				return nil, fmt.Errorf("failed to convert value for key %s: %w", key, err)
+// 			}
+// 			if convertedValue != nil {
+// 				options[key] = convertedValue
+// 			}
+// 		}
+// 	} else {
+// 		return nil, fmt.Errorf("expected object value, got %T", underlyingValue)
+// 	}
 
-	return options, nil
-}
+// 	return options, nil
+// }
 
-// Helper function to convert Terraform values to interface{}
-func convertTerraformValueToInterface(value attr.Value) (interface{}, error) {
-	if value.IsNull() || value.IsUnknown() {
-		return nil, nil
-	}
+// // Helper function to convert Terraform values to interface{}
+// func convertTerraformValueToInterface(value attr.Value) (interface{}, error) {
+// 	if value.IsNull() || value.IsUnknown() {
+// 		return nil, nil
+// 	}
 
-	switch v := value.(type) {
-	case types.String:
-		return v.ValueString(), nil
-	case types.Bool:
-		return v.ValueBool(), nil
-	case types.Int64:
-		return int(v.ValueInt64()), nil
-	case types.Float64:
-		return v.ValueFloat64(), nil
-	case types.Number:
-		if v.ValueBigFloat().IsInt() {
-			val, _ := v.ValueBigFloat().Int64()
-			return int(val), nil
-		} else {
-			val, _ := v.ValueBigFloat().Float64()
-			return val, nil
-		}
-	case types.List:
-		elements := v.Elements()
-		result := make([]interface{}, len(elements))
-		for i, elem := range elements {
-			converted, err := convertTerraformValueToInterface(elem)
-			if err != nil {
-				return nil, err
-			}
-			result[i] = converted
-		}
-		return result, nil
-	case types.Tuple:
-		elements := v.Elements()
-		result := make([]interface{}, len(elements))
-		for i, elem := range elements {
-			converted, err := convertTerraformValueToInterface(elem)
-			if err != nil {
-				return nil, err
-			}
-			result[i] = converted
-		}
-		return result, nil
-	case types.Object:
-		attrs := v.Attributes()
-		result := make(map[string]interface{})
-		for key, attr := range attrs {
-			converted, err := convertTerraformValueToInterface(attr)
-			if err != nil {
-				return nil, err
-			}
-			if converted != nil {
-				result[key] = converted
-			}
-		}
-		return result, nil
-	case types.Dynamic:
-		return convertTerraformValueToInterface(v.UnderlyingValue())
-	default:
-		switch baseVal := value.(type) {
-		case basetypes.StringValue:
-			return baseVal.ValueString(), nil
-		case basetypes.BoolValue:
-			return baseVal.ValueBool(), nil
-		case basetypes.Int64Value:
-			return int(baseVal.ValueInt64()), nil
-		case basetypes.Float64Value:
-			return baseVal.ValueFloat64(), nil
-		case basetypes.NumberValue:
-			if baseVal.ValueBigFloat().IsInt() {
-				val, _ := baseVal.ValueBigFloat().Int64()
-				return int(val), nil
-			} else {
-				val, _ := baseVal.ValueBigFloat().Float64()
-				return val, nil
-			}
-		case basetypes.ListValue:
-			elements := baseVal.Elements()
-			result := make([]interface{}, len(elements))
-			for i, elem := range elements {
-				converted, err := convertTerraformValueToInterface(elem)
-				if err != nil {
-					return nil, err
-				}
-				result[i] = converted
-			}
-			return result, nil
-		case basetypes.TupleValue:
-			elements := baseVal.Elements()
-			result := make([]interface{}, len(elements))
-			for i, elem := range elements {
-				converted, err := convertTerraformValueToInterface(elem)
-				if err != nil {
-					return nil, err
-				}
-				result[i] = converted
-			}
-			return result, nil
-		case basetypes.ObjectValue:
-			attrs := baseVal.Attributes()
-			result := make(map[string]interface{})
-			for key, attr := range attrs {
-				converted, err := convertTerraformValueToInterface(attr)
-				if err != nil {
-					return nil, err
-				}
-				if converted != nil {
-					result[key] = converted
-				}
-			}
-			return result, nil
-		default:
-			return fmt.Sprintf("%v", value), nil
-		}
-	}
-}
+// 	switch v := value.(type) {
+// 	case types.Dynamic:
+// 		return convertTerraformValueToInterface(v.UnderlyingValue())
+// 	case basetypes.StringValue:
+// 		return v.ValueString(), nil
+// 	case basetypes.BoolValue:
+// 		return v.ValueBool(), nil
+// 	case basetypes.Int64Value:
+// 		return int(v.ValueInt64()), nil
+// 	case basetypes.Float64Value:
+// 		return v.ValueFloat64(), nil
+// 	case basetypes.NumberValue:
+// 		bigFloat := v.ValueBigFloat()
+// 		if bigFloat.IsInt() {
+// 			if val, accuracy := bigFloat.Int64(); accuracy == big.Exact {
+// 				return int(val), nil
+// 			}
+// 		}
+// 		if val, accuracy := bigFloat.Float64(); accuracy == big.Exact {
+// 			return val, nil
+// 		}
+// 	case basetypes.ListValue:
+// 		return convertElements(v.Elements())
+// 	case basetypes.TupleValue:
+// 		return convertElements(v.Elements())
+// 	case basetypes.ObjectValue:
+// 		result := make(map[string]interface{})
+// 		for key, attr := range v.Attributes() {
+// 			converted, err := convertTerraformValueToInterface(attr)
+// 			if err != nil {
+// 				return nil, err
+// 			}
+// 			if converted != nil {
+// 				result[key] = converted
+// 			}
+// 		}
+// 		return result, nil
+// 	}
 
-// FromAPILegacyAPIKey converts API response to Terraform model
-func (m *LegacyAPIKeyModel) FromAPILegacyAPIKey(serviceID string, apiKey *api.LegacyAPIKeyResponse) {
-	m.ServiceID = types.StringValue(serviceID)
-	if apiKey != nil {
-		m.APIKey = types.StringValue(apiKey.APIKey)
-	} else {
-		m.APIKey = types.StringNull()
-	}
-}
+// 	// Fallback to string representation
+// 	return fmt.Sprintf("%v", value), nil
+// }
+
+// func convertElements(elements []attr.Value) ([]interface{}, error) {
+// 	result := make([]interface{}, len(elements))
+// 	for i, elem := range elements {
+// 		converted, err := convertTerraformValueToInterface(elem)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		result[i] = converted
+// 	}
+// 	return result, nil
+// }
 
 // FromAPIProtectServeKey converts API response to Terraform model
 func (m *ProtectServeKeyModel) FromAPIProtectServeKey(serviceID string, response *api.ProtectServeKeyResponse) {

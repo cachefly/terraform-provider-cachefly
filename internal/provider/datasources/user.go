@@ -211,7 +211,7 @@ func (d *UsersDataSource) mapUsersToState(usersResp *api.ListUsersResponse, data
 			Username:               types.StringValue(user.Username),
 			Email:                  types.StringValue(user.Email),
 			FullName:               types.StringValue(user.FullName),
-			Phone:                  types.StringValue(user.Phone),
+			Phone:                  types.StringPointerValue(user.Phone),
 			PasswordChangeRequired: types.BoolValue(user.PasswordChangeRequired),
 			Status:                 types.StringValue(user.Status),
 			CreatedAt:              types.StringValue(user.CreatedAt),

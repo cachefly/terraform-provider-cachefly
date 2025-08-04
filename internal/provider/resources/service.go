@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -72,11 +72,9 @@ func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Description: "Whether to automatically provision SSL certificates.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
 			},
 			"configuration_mode": schema.StringAttribute{
 				Description: "The configuration mode for the service.",
-				Optional:    true,
 				Computed:    true,
 			},
 			"tls_profile": schema.StringAttribute{
@@ -86,6 +84,11 @@ func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"delivery_region": schema.StringAttribute{
 				Description: "The delivery region for the service.",
 				Optional:    true,
+			},
+			"options": schema.DynamicAttribute{
+				Description: "Service options configuration as key-value pairs. Each option follows the enabled/value structure for feature options.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"status": schema.StringAttribute{
 				Description: "The current status of the service.",
@@ -165,11 +168,6 @@ func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest
 		updateReq.AutoSSL = data.AutoSSL.ValueBool()
 	}
 
-	if !data.ConfigurationMode.IsNull() && !data.ConfigurationMode.IsUnknown() && data.ConfigurationMode.ValueString() != "" {
-		needsUpdate = true
-		updateReq.ConfigurationMode = data.ConfigurationMode.ValueString()
-	}
-
 	if !data.TLSProfile.IsNull() && !data.TLSProfile.IsUnknown() && data.TLSProfile.ValueString() != "" {
 		needsUpdate = true
 		updateReq.TLSProfile = data.TLSProfile.ValueString()
@@ -181,12 +179,6 @@ func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	if needsUpdate {
-		tflog.Debug(ctx, "Updating service configuration", map[string]interface{}{
-			"service_id":          service.ID,
-			"config_mode_request": updateReq.ConfigurationMode,
-			"auto_ssl_request":    updateReq.AutoSSL,
-		})
-
 		updatedService, err := r.client.Services.UpdateServiceByID(ctx, service.ID, updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -196,14 +188,38 @@ func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest
 			return
 		}
 
-		tflog.Debug(ctx, "Service update response", map[string]interface{}{
-			"config_mode_response": updatedService.ConfigurationMode,
-			"auto_ssl_response":    updatedService.AutoSSL,
-		})
-
 		service = updatedService
 	} else {
 		tflog.Debug(ctx, "Skipping service configuration update - no optional fields provided")
+	}
+
+	if !data.Options.IsNull() && !data.Options.IsUnknown() {
+		serviceOptions, err := data.ToAPIServiceOptions()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error converting service options",
+				"Could not convert service options: "+err.Error(),
+			)
+			return
+		}
+
+		_, err = r.client.ServiceOptions.UpdateOptions(ctx, service.ID, serviceOptions)
+		if err != nil {
+			// Check if it's a validation error
+			if validationErr, ok := err.(api.ServiceOptionsValidationError); ok {
+				resp.Diagnostics.AddError(
+					"Service Options Validation Failed",
+					fmt.Sprintf("Validation failed: %s. Details: %v", validationErr.Message, validationErr.Errors),
+				)
+				return
+			}
+
+			resp.Diagnostics.AddError(
+				"Error updating service options",
+				"Could not update service options: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Map response to Terraform state
@@ -236,6 +252,15 @@ func (r *ServiceResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	// Handle service options based on whether they are configured or imported
+	if err := r.handleServiceOptionsRead(ctx, &data); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading Service Options",
+			"Could not read service options: "+err.Error(),
+		)
+		return
+	}
+
 	// Map fresh API data to state
 	r.mapServiceToState(service, &data)
 
@@ -257,19 +282,12 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Only set optional fields if they have actual values
-	if !data.ConfigurationMode.IsNull() && !data.ConfigurationMode.IsUnknown() && data.ConfigurationMode.ValueString() != "" {
-		updateReq.ConfigurationMode = data.ConfigurationMode.ValueString()
-	}
 	if !data.TLSProfile.IsNull() && !data.TLSProfile.IsUnknown() && data.TLSProfile.ValueString() != "" {
 		updateReq.TLSProfile = data.TLSProfile.ValueString()
 	}
 	if !data.DeliveryRegion.IsNull() && !data.DeliveryRegion.IsUnknown() && data.DeliveryRegion.ValueString() != "" {
 		updateReq.DeliveryRegion = data.DeliveryRegion.ValueString()
 	}
-
-	tflog.Debug(ctx, "Updating CacheFly service", map[string]interface{}{
-		"id": data.ID.ValueString(),
-	})
 
 	service, err := r.client.Services.UpdateServiceByID(ctx, data.ID.ValueString(), updateReq)
 	if err != nil {
@@ -280,10 +298,68 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	// Map updated service to state
 	r.mapServiceToState(service, &data)
 
-	// Save updated data into Terraform state
+	if !data.Options.IsNull() && !data.Options.IsUnknown() {
+		// Get current state to compare with planned changes
+		var currentState models.ServiceResourceModel
+		resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Convert both current and planned options to API format for comparison
+		currentOptions, err := currentState.ToAPIServiceOptions()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Converting Current Service Options",
+				"Could not convert current service options: "+err.Error(),
+			)
+			return
+		}
+
+		plannedOptions, err := data.ToAPIServiceOptions()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Converting Planned Service Options",
+				"Could not convert planned service options: "+err.Error(),
+			)
+			return
+		}
+
+		// Compare and create a map of only changed options
+		changedOptions := make(api.ServiceOptions)
+
+		// Check each planned option against current state
+		for key, plannedValue := range plannedOptions {
+			currentValue, exists := currentOptions[key]
+
+			// Include option if it's new or value has changed
+			if !exists || !r.compareOptionValues(currentValue, plannedValue) {
+				changedOptions[key] = plannedValue
+			}
+		}
+
+		// Only update if there are actual changes
+		if len(changedOptions) > 0 {
+			tflog.Debug(ctx, "Updating changed service options", map[string]interface{}{
+				"service_id":      data.ID.ValueString(),
+				"changed_options": len(changedOptions),
+			})
+
+			_, err = r.client.ServiceOptions.UpdateOptions(ctx, data.ID.ValueString(), changedOptions)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error Updating CacheFly Service Options",
+					"Could not update service options: "+err.Error(),
+				)
+				return
+			}
+		} else {
+			tflog.Debug(ctx, "No service options changes detected, skipping update")
+		}
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -321,12 +397,219 @@ func (r *ServiceResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+func (r *ServiceResource) handleServiceOptionsRead(ctx context.Context, data *models.ServiceResourceModel) error {
+	serviceID := data.ID.ValueString()
+	if data.Options.IsNull() || data.Options.IsUnknown() {
+		if r.isPostImportRead(data) {
+			allOptions, err := r.client.ServiceOptions.GetOptions(ctx, serviceID)
+			if err != nil {
+				return fmt.Errorf("could not read service options for imported service: %w", err)
+			}
+
+			if err := r.setOptionsFromAPI(data, allOptions); err != nil {
+				return fmt.Errorf("could not convert service options: %w", err)
+			}
+
+			tflog.Debug(ctx, "Loaded all service options for imported resource", map[string]interface{}{
+				"service_id":    serviceID,
+				"options_count": len(allOptions),
+			})
+		}
+		return nil
+	}
+
+	currentOptions, err := data.ToAPIServiceOptions()
+	if err != nil {
+		return fmt.Errorf("could not convert current options: %w", err)
+	}
+
+	allApiOptions, err := r.client.ServiceOptions.GetOptions(ctx, serviceID)
+	if err != nil {
+		return fmt.Errorf("could not read current service options: %w", err)
+	}
+
+	managedOptions := make(api.ServiceOptions)
+	for key := range currentOptions {
+		if apiValue, exists := allApiOptions[key]; exists {
+			// Apply recursive filtering to only include configured nested fields
+			managedOptions[key] = r.filterNestedOptions(currentOptions[key], apiValue)
+		}
+	}
+
+	if err := r.setOptionsFromAPI(data, managedOptions); err != nil {
+		return fmt.Errorf("could not convert managed options: %w", err)
+	}
+
+	tflog.Debug(ctx, "Refreshed managed service options", map[string]interface{}{
+		"service_id":    serviceID,
+		"options_count": len(managedOptions),
+	})
+
+	return nil
+}
+
+// isPostImportRead detects if this is a read immediately after import
+// by checking if we have minimal state (indicating fresh import)
+func (r *ServiceResource) isPostImportRead(data *models.ServiceResourceModel) bool {
+	// After import, we typically only have ID set and other fields may be in default state
+	// We can check if computed fields like Status, CreatedAt are not set yet
+	return data.Status.IsNull() || data.CreatedAt.IsNull()
+}
+
+// setOptionsFromAPI converts API ServiceOptions directly to the ServiceModel's Options field
+func (r *ServiceResource) setOptionsFromAPI(data *models.ServiceResourceModel, options api.ServiceOptions) error {
+	// Convert map[string]interface{} to types.Dynamic
+	if len(options) > 0 {
+		// Create a map[string]attr.Value for the dynamic type
+		elements := make(map[string]attr.Value)
+		attrTypes := make(map[string]attr.Type)
+
+		for key, value := range options {
+			// Convert interface{} to appropriate types.Value based on type
+			convertedValue, attrType := convertInterfaceToAttrValue(value)
+			elements[key] = convertedValue
+			attrTypes[key] = attrType
+		}
+
+		// Create the object value
+		objValue, diags := types.ObjectValue(attrTypes, elements)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert options to object: %v", diags.Errors())
+		}
+
+		data.Options = types.DynamicValue(objValue)
+	} else {
+		data.Options = types.DynamicNull()
+	}
+
+	return nil
+}
+
+// filterNestedOptions recursively filters API options to only include fields that were configured
+func (r *ServiceResource) filterNestedOptions(current, api interface{}) interface{} {
+	currentMap, currentIsMap := current.(map[string]interface{})
+	apiMap, apiIsMap := api.(map[string]interface{})
+
+	if currentIsMap && apiIsMap {
+		filtered := make(map[string]interface{})
+		for key := range currentMap {
+			if apiValue, exists := apiMap[key]; exists {
+				// Recursively filter nested objects
+				filtered[key] = r.filterNestedOptions(currentMap[key], apiValue)
+			}
+		}
+		return filtered
+	}
+
+	// For non-map values, just return the API value
+	return api
+}
+
+// convertInterfaceToAttrValue converts interface{} to attr.Value and attr.Type
+func convertInterfaceToAttrValue(value interface{}) (attr.Value, attr.Type) {
+	switch v := value.(type) {
+	case string:
+		return types.StringValue(v), types.StringType
+	case bool:
+		return types.BoolValue(v), types.BoolType
+	case int:
+		return types.Int64Value(int64(v)), types.Int64Type
+	case int64:
+		return types.Int64Value(v), types.Int64Type
+	case float64:
+		return types.Float64Value(v), types.Float64Type
+	case map[string]interface{}:
+		nestedElements := make(map[string]attr.Value)
+		nestedAttrTypes := make(map[string]attr.Type)
+
+		for nestedKey, nestedValue := range v {
+			nestedAttrValue, nestedAttrType := convertInterfaceToAttrValue(nestedValue)
+			nestedElements[nestedKey] = nestedAttrValue
+			nestedAttrTypes[nestedKey] = nestedAttrType
+		}
+
+		objValue, _ := types.ObjectValue(nestedAttrTypes, nestedElements)
+		return objValue, types.ObjectType{AttrTypes: nestedAttrTypes}
+	case []interface{}:
+		if len(v) == 0 {
+			listValue, _ := types.ListValue(types.StringType, []attr.Value{})
+			return listValue, types.ListType{ElemType: types.StringType}
+		}
+
+		listElements := make([]attr.Value, len(v))
+		var elemType attr.Type = types.StringType
+
+		for i, item := range v {
+			itemValue, itemType := convertInterfaceToAttrValue(item)
+			listElements[i] = itemValue
+			if i == 0 {
+				elemType = itemType
+			}
+		}
+
+		listValue, _ := types.ListValue(elemType, listElements)
+		return listValue, types.ListType{ElemType: elemType}
+	default:
+		return types.StringValue(fmt.Sprintf("%v", v)), types.StringType
+	}
+}
+
+// compareOptionValues compares two option values to determine if they are equal
+// This handles the various data types that service options can contain
+func (r *ServiceResource) compareOptionValues(current, planned interface{}) bool {
+	// Handle nil cases
+	if current == nil && planned == nil {
+		return true
+	}
+	if current == nil || planned == nil {
+		return false
+	}
+
+	// Handle maps (complex options like reverseProxy, redirect, etc.)
+	if currentMap, ok := current.(map[string]interface{}); ok {
+		if plannedMap, ok := planned.(map[string]interface{}); ok {
+			// Compare maps recursively
+			if len(currentMap) != len(plannedMap) {
+				return false
+			}
+			for key, currentVal := range currentMap {
+				plannedVal, exists := plannedMap[key]
+				if !exists || !r.compareOptionValues(currentVal, plannedVal) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	}
+
+	// Handle slices/arrays
+	if currentSlice, ok := current.([]interface{}); ok {
+		if plannedSlice, ok := planned.([]interface{}); ok {
+			if len(currentSlice) != len(plannedSlice) {
+				return false
+			}
+			for i, currentVal := range currentSlice {
+				if !r.compareOptionValues(currentVal, plannedSlice[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	}
+
+	// Handle primitive types (string, bool, int, float)
+	return current == planned
+}
+
 // IMPORTANT: to use what the API returns, not what the user configured
 func (r *ServiceResource) mapServiceToState(service *api.Service, data *models.ServiceResourceModel) {
 	// Core fields - always use API response
 	data.ID = types.StringValue(service.ID)
 	data.Name = types.StringValue(service.Name)
 	data.UniqueName = types.StringValue(service.UniqueName)
+	data.Description = types.StringValue(service.Description)
 	data.Status = types.StringValue(service.Status)
 	data.CreatedAt = types.StringValue(service.CreatedAt)
 	data.UpdatedAt = types.StringValue(service.UpdatedAt)

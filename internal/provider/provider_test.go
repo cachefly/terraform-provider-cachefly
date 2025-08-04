@@ -8,21 +8,13 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 )
 
-// testAccProtoV6ProviderFactories are used to instantiate a provider during
-// acceptance testing.
-var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"cachefly": providerserver.NewProtocol6WithError(New("test")()),
-}
-
 func TestProvider(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProviderConfig,
@@ -126,7 +118,7 @@ func TestProviderConfigure(t *testing.T) {
 
 			if tt.expectError {
 				resource.Test(t, resource.TestCase{
-					ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+					ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories,
 					Steps: []resource.TestStep{
 						{
 							Config:      tt.config,
@@ -136,7 +128,7 @@ func TestProviderConfigure(t *testing.T) {
 				})
 			} else {
 				resource.Test(t, resource.TestCase{
-					ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+					ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories,
 					Steps: []resource.TestStep{
 						{
 							Config: tt.config,
@@ -193,17 +185,6 @@ func TestGetConfigValue(t *testing.T) {
 			}
 
 		})
-	}
-}
-
-// testAccPreCheck validates that required environment variables are set for acceptance tests
-func testAccPreCheck(t *testing.T) {
-	if v := os.Getenv("TF_ACC"); v == "" {
-		t.Skip("Acceptance tests skipped unless env 'TF_ACC' is set")
-	}
-
-	if v := os.Getenv("CACHEFLY_API_TOKEN"); v == "" {
-		t.Fatal("CACHEFLY_API_TOKEN must be set for acceptance tests")
 	}
 }
 
