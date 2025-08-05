@@ -16,7 +16,6 @@ var TestAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 	"cachefly": providerserver.NewProtocol6WithError(New("test")()),
 }
 
-// TestAccPreCheck validates that required environment variables are set for acceptance tests
 func TestAccPreCheck(t *testing.T) {
 	if v := os.Getenv("TF_ACC"); v == "" {
 		t.Skip("Acceptance tests skipped unless env 'TF_ACC' is set")

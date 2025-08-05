@@ -76,7 +76,7 @@ func (d *OriginsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 							Computed:    true,
 						},
 						"scheme": schema.StringAttribute{
-							Description: "Protocol scheme (http or https).",
+							Description: "Protocol scheme (HTTP, HTTPS or FOLLOW).",
 							Computed:    true,
 						},
 						"cache_by_query_param": schema.BoolAttribute{

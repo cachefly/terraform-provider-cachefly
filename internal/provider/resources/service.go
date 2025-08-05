@@ -88,7 +88,7 @@ func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"options": schema.DynamicAttribute{
 				Description: "Service options configuration as key-value pairs. Each option follows the enabled/value structure for feature options.",
 				Optional:    true,
-				Computed:    true,
+				// Computed:    true,
 			},
 			"status": schema.StringAttribute{
 				Description: "The current status of the service.",

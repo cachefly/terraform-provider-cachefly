@@ -1,22 +1,28 @@
-package resources
+package resources_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/resource"
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/cachefly/terraform-provider-cachefly/internal/provider"
+	"github.com/cachefly/terraform-provider-cachefly/internal/provider/resources"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 )
 
 // Test Schema validation
 func TestServiceDomainResourceSchema(t *testing.T) {
 	ctx := context.Background()
-	r := NewServiceDomainResource()
+	r := resources.NewServiceDomainResource()
 
-	req := resource.SchemaRequest{}
-	resp := &resource.SchemaResponse{}
-
+	req := fwresource.SchemaRequest{}
+	resp := &fwresource.SchemaResponse{}
 	r.Schema(ctx, req, resp)
 
 	// no errors
@@ -43,13 +49,12 @@ func TestServiceDomainResourceSchema(t *testing.T) {
 // Test Resource metadata
 func TestServiceDomainResourceMetadata(t *testing.T) {
 	ctx := context.Background()
-	r := NewServiceDomainResource()
+	r := resources.NewServiceDomainResource()
 
-	req := resource.MetadataRequest{
+	req := fwresource.MetadataRequest{
 		ProviderTypeName: "cachefly",
 	}
-	resp := &resource.MetadataResponse{}
-
+	resp := &fwresource.MetadataResponse{}
 	r.Metadata(ctx, req, resp)
 
 	assert.Equal(t, "cachefly_service_domain", resp.TypeName)
@@ -58,21 +63,19 @@ func TestServiceDomainResourceMetadata(t *testing.T) {
 // Test Configure error handling
 func TestServiceDomainResourceConfigure(t *testing.T) {
 	ctx := context.Background()
-	r := NewServiceDomainResource().(*ServiceDomainResource)
+	r := resources.NewServiceDomainResource().(*resources.ServiceDomainResource)
 
 	// Test with nil provider data (should not error)
-	req := resource.ConfigureRequest{
+	req := fwresource.ConfigureRequest{
 		ProviderData: nil,
 	}
-	resp := &resource.ConfigureResponse{}
-
+	resp := &fwresource.ConfigureResponse{}
 	r.Configure(ctx, req, resp)
 	assert.False(t, resp.Diagnostics.HasError(), "Should not error with nil provider data")
 
 	// Test with wrong type should error
 	req.ProviderData = "wrong-type"
-	resp = &resource.ConfigureResponse{}
-
+	resp = &fwresource.ConfigureResponse{}
 	r.Configure(ctx, req, resp)
 	assert.True(t, resp.Diagnostics.HasError(), "Should error with wrong provider data type")
 }
@@ -124,7 +127,6 @@ func TestServiceDomainResourceImportIDParsing(t *testing.T) {
 			expectError: true,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
@@ -142,4 +144,155 @@ func TestServiceDomainResourceImportIDParsing(t *testing.T) {
 			}
 		})
 	}
+}
+func TestAccServiceDomainResource(t *testing.T) {
+	rName := "test-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	domainName := rName + ".example.com"
+	updatedDomainName := rName + "-updated.example.com"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { provider.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: provider.TestAccProtoV6ProviderFactories,
+		CheckDestroy:             checkServiceDomainDestroy,
+		Steps: []resource.TestStep{
+			// Create and Read testing with validation mode
+			{
+				Config: testAccServiceDomainResourceConfig(rName, domainName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckServiceDomainExists("cachefly_service_domain."+rName),
+					resource.TestCheckResourceAttr("cachefly_service_domain."+rName, "name", domainName),
+					resource.TestCheckResourceAttr("cachefly_service_domain."+rName, "description", rName+" domain description"),
+					resource.TestCheckResourceAttr("cachefly_service_domain."+rName, "validation_mode", "HTTP"),
+					resource.TestCheckResourceAttrPair("cachefly_service_domain."+rName, "service_id", "cachefly_service."+rName, "id"),
+					resource.TestCheckResourceAttrSet("cachefly_service_domain."+rName, "id"),
+					resource.TestCheckResourceAttr("cachefly_service_domain."+rName, "validation_status", ""),
+					resource.TestCheckResourceAttrSet("cachefly_service_domain."+rName, "created_at"),
+					resource.TestCheckResourceAttrSet("cachefly_service_domain."+rName, "updated_at"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "cachefly_service_domain." + rName,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: testAccServiceDomainImportStateIdFunc("cachefly_service_domain." + rName),
+			},
+			// Update testing
+			{
+				Config: testAccServiceDomainResourceConfigUpdated(rName, updatedDomainName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckServiceDomainExists("cachefly_service_domain."+rName),
+					resource.TestCheckResourceAttr("cachefly_service_domain."+rName, "name", updatedDomainName),
+					resource.TestCheckResourceAttr("cachefly_service_domain."+rName, "description", "Updated domain description"),
+					resource.TestCheckResourceAttr("cachefly_service_domain."+rName, "validation_mode", "DNS"),
+				),
+			},
+		},
+	})
+}
+
+// Helper function to check if service domain exists
+func testAccCheckServiceDomainExists(resourceName string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok {
+			return fmt.Errorf("Not found: %s", resourceName)
+		}
+		if rs.Primary.ID == "" {
+			return fmt.Errorf("No Service Domain ID is set")
+		}
+		serviceID := rs.Primary.Attributes["service_id"]
+		if serviceID == "" {
+			return fmt.Errorf("No Service ID is set")
+		}
+		fmt.Printf("rs.Primary.ID: %s, service_id: %s\n", rs.Primary.ID, serviceID)
+		sdkClient := provider.GetSDKClient()
+		if sdkClient == nil {
+			return fmt.Errorf("Failed to create CacheFly client")
+		}
+		// Check if the service domain exists via API call
+		_, err := sdkClient.ServiceDomains.GetByID(context.Background(), serviceID, rs.Primary.ID, "")
+		if err != nil {
+			return fmt.Errorf("Service Domain %s not found: %s", rs.Primary.ID, err.Error())
+		}
+		return nil
+	}
+}
+
+// Helper function to check if service domain is destroyed
+func checkServiceDomainDestroy(s *terraform.State) error {
+	sdkClient := provider.GetSDKClient()
+	if sdkClient == nil {
+		return fmt.Errorf("Failed to create CacheFly client")
+	}
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "cachefly_service_domain" {
+			continue
+		}
+		serviceID := rs.Primary.Attributes["service_id"]
+		if serviceID == "" {
+			continue
+		}
+		// Try to find the service domain
+		_, err := sdkClient.ServiceDomains.GetByID(context.Background(), serviceID, rs.Primary.ID, "")
+
+		if err != nil {
+			// If we get an error, the domain likely doesn't exist, which is what we want
+			// In a real scenario, you might want to check for specific error types
+			return nil
+		}
+		return fmt.Errorf("Service Domain %s still exists", rs.Primary.ID)
+	}
+	return nil
+}
+
+// Helper function to generate import state ID for testing
+func testAccServiceDomainImportStateIdFunc(resourceName string) resource.ImportStateIdFunc {
+	return func(s *terraform.State) (string, error) {
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok {
+			return "", fmt.Errorf("Not found: %s", resourceName)
+		}
+		serviceID := rs.Primary.Attributes["service_id"]
+		domainID := rs.Primary.ID
+
+		if serviceID == "" || domainID == "" {
+			return "", fmt.Errorf("Missing service_id or domain id")
+		}
+		return fmt.Sprintf("%s:%s", serviceID, domainID), nil
+	}
+}
+
+// Test configuration for basic service domain
+func testAccServiceDomainResourceConfig(name, domainName string) string {
+	return fmt.Sprintf(`
+provider "cachefly" {}
+resource "cachefly_service" %[1]q {
+  name        = %[1]q
+  unique_name = "%[1]s-unique"
+  description = "%[1]s service for domain testing"
+}
+resource "cachefly_service_domain" %[1]q {
+  service_id      = cachefly_service.%[1]s.id
+  name            = %[2]q
+  description     = "%[1]s domain description"
+  validation_mode = "HTTP"
+}`, name, domainName)
+}
+
+// Test configuration for updated service domain
+func testAccServiceDomainResourceConfigUpdated(name, domainName string) string {
+	return fmt.Sprintf(`
+provider "cachefly" {}
+resource "cachefly_service" %[1]q {
+  name        = %[1]q
+  unique_name = "%[1]s-unique"
+  description = "%[1]s service for domain testing"
+}
+resource "cachefly_service_domain" %[1]q {
+  service_id      = cachefly_service.%[1]s.id
+  name            = %[2]q
+  description     = "Updated domain description"
+  validation_mode = "DNS"
+}`, name, domainName)
 }

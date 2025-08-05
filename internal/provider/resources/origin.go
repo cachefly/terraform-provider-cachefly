@@ -54,7 +54,7 @@ func (r *OriginResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "Type of origin (e.g., 'http', 's3', 'gcs').",
+				Description: "Type of origin ('WEB', 'GEO', 'FAILOVER', 'S3_BUCKET').",
 				Required:    true,
 			},
 			"name": schema.StringAttribute{
