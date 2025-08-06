@@ -195,7 +195,7 @@ func TestProviderResources(t *testing.T) {
 
 	resources := provider.Resources(ctx)
 
-	expectedResourceCount := 7 // we will update this based on our provider
+	expectedResourceCount := 7 // Updated to include log_target resource
 	assert.Len(t, resources, expectedResourceCount, "Should have expected number of resources")
 
 	// Test that each resource can be instantiated

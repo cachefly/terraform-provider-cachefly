@@ -127,6 +127,7 @@ func (p *CacheFlyProvider) Resources(ctx context.Context) []func() resource.Reso
 		resources.NewUserResource,
 		resources.NewScriptConfigResource,
 		resources.NewCertificateResource,
+		resources.NewLogTargetResource,
 	}
 }
 
