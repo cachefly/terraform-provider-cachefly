@@ -97,6 +97,7 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 				Optional:    true,
 				ElementType: types.StringType,
 				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+				Computed:    true,
 			},
 			"ssl": schema.BoolAttribute{
 				Description: "Whether to use SSL/TLS.",
@@ -128,17 +129,19 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 				Optional:    true,
 				Sensitive:   true,
 			},
-			"accessLogsServices": schema.ListAttribute{
+			"access_logs_services": schema.ListAttribute{
 				Description: "List of service IDs to enable access logs for.",
 				Optional:    true,
 				ElementType: types.StringType,
 				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+				Computed:    true,
 			},
-			"originLogsServices": schema.ListAttribute{
+			"origin_logs_services": schema.ListAttribute{
 				Description: "List of service IDs to enable origin logs for.",
 				Optional:    true,
 				ElementType: types.StringType,
 				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{
 				Description: "When the log target was created.",
@@ -249,7 +252,7 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	var needToUpdateLogging = false
-	var enableLoggingRequest api.EnableLoggingRequest
+	var setLoggingRequest api.SetLoggingRequest
 	if !data.AccessLogsServices.IsNull() && !data.AccessLogsServices.IsUnknown() {
 		needToUpdateLogging = true
 		var accessLogsServices []string
@@ -257,7 +260,7 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		enableLoggingRequest.AccessLogsServices = accessLogsServices
+		setLoggingRequest.AccessLogsServices = accessLogsServices
 	}
 
 	if !data.OriginLogsServices.IsNull() && !data.OriginLogsServices.IsUnknown() {
@@ -267,11 +270,11 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		enableLoggingRequest.OriginLogsServices = originLogsServices
+		setLoggingRequest.OriginLogsServices = originLogsServices
 	}
 
 	if needToUpdateLogging {
-		_, err := r.client.LogTargets.EnableLogging(ctx, logTarget.ID, enableLoggingRequest)
+		_, err := r.client.LogTargets.SetLogging(ctx, logTarget.ID, setLoggingRequest)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Enabling Logging",
@@ -399,6 +402,84 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	// Get current state to compare with planned changes
+	var currentState models.LogTargetResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var needToUpdateLogging = false
+	var setLoggingRequest api.SetLoggingRequest
+
+	// Check if AccessLogsServices has changed
+	var plannedAccessLogsServices []string
+	resp.Diagnostics.Append(data.AccessLogsServices.ElementsAs(ctx, &plannedAccessLogsServices, false)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Get current access logs services for comparison
+	var currentAccessLogsServices []string
+	if !currentState.AccessLogsServices.IsNull() && !currentState.AccessLogsServices.IsUnknown() {
+		resp.Diagnostics.Append(currentState.AccessLogsServices.ElementsAs(ctx, &currentAccessLogsServices, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	// Compare the lists to see if they've changed
+	if !r.slicesHaveEqualElements(currentAccessLogsServices, plannedAccessLogsServices) {
+		needToUpdateLogging = true
+		setLoggingRequest.AccessLogsServices = plannedAccessLogsServices
+		tflog.Debug(ctx, "AccessLogsServices changed, will update logging", map[string]interface{}{
+			"current_services": currentAccessLogsServices,
+			"planned_services": plannedAccessLogsServices,
+		})
+	} else {
+		tflog.Debug(ctx, "AccessLogsServices unchanged, skipping logging update")
+	}
+
+	// Check if OriginLogsServices has changed
+	var plannedOriginLogsServices []string
+	resp.Diagnostics.Append(data.OriginLogsServices.ElementsAs(ctx, &plannedOriginLogsServices, false)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Get current origin logs services for comparison
+	var currentOriginLogsServices []string
+	if !currentState.OriginLogsServices.IsNull() && !currentState.OriginLogsServices.IsUnknown() {
+		resp.Diagnostics.Append(currentState.OriginLogsServices.ElementsAs(ctx, &currentOriginLogsServices, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	// Compare the lists to see if they've changed
+	if !r.slicesHaveEqualElements(currentOriginLogsServices, plannedOriginLogsServices) {
+		needToUpdateLogging = true
+		setLoggingRequest.OriginLogsServices = plannedOriginLogsServices
+		tflog.Debug(ctx, "OriginLogsServices changed, will update logging", map[string]interface{}{
+			"current_services": currentOriginLogsServices,
+			"planned_services": plannedOriginLogsServices,
+		})
+	} else {
+		tflog.Debug(ctx, "OriginLogsServices unchanged, skipping logging update")
+	}
+
+	// Update logging if needed
+	if needToUpdateLogging {
+		_, err := r.client.LogTargets.SetLogging(ctx, data.ID.ValueString(), setLoggingRequest)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Enabling Logging",
+				"Could not enable logging, unexpected error: "+err.Error(),
+			)
+			return
+		}
+	}
+
 	// Map response to state
 	r.mapLogTargetToState(logTarget, &data)
 
@@ -512,4 +593,58 @@ func (r *LogTargetResource) mapLogTargetToState(logTarget *api.LogTarget, data *
 	} else {
 		data.Hosts = types.ListValueMust(types.StringType, []attr.Value{})
 	}
+
+	if len(logTarget.AccessLogsServices) > 0 {
+		accessLogsServicesElements := make([]attr.Value, len(logTarget.AccessLogsServices))
+		for i, service := range logTarget.AccessLogsServices {
+			accessLogsServicesElements[i] = types.StringValue(service)
+		}
+		data.AccessLogsServices = types.ListValueMust(types.StringType, accessLogsServicesElements)
+	} else {
+		data.AccessLogsServices = types.ListValueMust(types.StringType, []attr.Value{})
+	}
+
+	if len(logTarget.OriginLogsServices) > 0 {
+		originLogsServicesElements := make([]attr.Value, len(logTarget.OriginLogsServices))
+		for i, service := range logTarget.OriginLogsServices {
+			originLogsServicesElements[i] = types.StringValue(service)
+		}
+		data.OriginLogsServices = types.ListValueMust(types.StringType, originLogsServicesElements)
+	} else {
+		data.OriginLogsServices = types.ListValueMust(types.StringType, []attr.Value{})
+	}
+}
+
+// slicesHaveEqualElements compares two string slices for equality
+// Returns true if they are equal, false otherwise
+func (r *LogTargetResource) slicesHaveEqualElements(current, planned []string) bool {
+	if len(current) != len(planned) {
+		return false
+	}
+
+	// Create maps to count occurrences for order-independent comparison
+	currentMap := make(map[string]int)
+	plannedMap := make(map[string]int)
+
+	for _, item := range current {
+		currentMap[item]++
+	}
+
+	for _, item := range planned {
+		plannedMap[item]++
+	}
+
+	// Compare the maps
+	if len(currentMap) != len(plannedMap) {
+		return false
+	}
+
+	for key, currentCount := range currentMap {
+		plannedCount, exists := plannedMap[key]
+		if !exists || currentCount != plannedCount {
+			return false
+		}
+	}
+
+	return true
 }

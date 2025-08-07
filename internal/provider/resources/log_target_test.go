@@ -49,6 +49,8 @@ func TestLogTargetResourceSchema(t *testing.T) {
 	assert.Contains(t, attrs, "user")
 	assert.Contains(t, attrs, "password")
 	assert.Contains(t, attrs, "api_key")
+	assert.Contains(t, attrs, "accessLogsServices")
+	assert.Contains(t, attrs, "originLogsServices")
 
 	// computed attributes exist
 	assert.Contains(t, attrs, "created_at")
@@ -113,10 +115,14 @@ func TestAccLogTargetResourceS3(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckLogTargetExists("cachefly_log_target."+rName),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "S3_BUCKET"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "S3"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "bucket", "my-log-bucket"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "region", "us-east-1"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "signature_version", "v4"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "access_logs_services.#", "1"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "origin_logs_services.#", "1"),
+					resource.TestCheckResourceAttrPair("cachefly_log_target."+rName, "access_logs_services.0", "cachefly_service."+rName, "id"),
+					resource.TestCheckResourceAttrPair("cachefly_log_target."+rName, "origin_logs_services.0", "cachefly_service."+rName, "id"),
 					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "id"),
 					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "created_at"),
 					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "updated_at"),
@@ -158,6 +164,10 @@ func TestAccLogTargetResourceElasticsearch(t *testing.T) {
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "ssl_certificate_verification", "true"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "index", "cachefly-logs"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "user", "elastic"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "access_logs_services.#", "1"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "origin_logs_services.#", "1"),
+					resource.TestCheckResourceAttrPair("cachefly_log_target."+rName, "access_logs_services.0", "cachefly_service."+rName, "id"),
+					resource.TestCheckResourceAttrPair("cachefly_log_target."+rName, "origin_logs_services.0", "cachefly_service."+rName, "id"),
 					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "id"),
 				),
 			},
@@ -300,14 +310,24 @@ func testAccLogTargetResourceConfigS3(name string) string {
 	return fmt.Sprintf(`
 provider "cachefly" {}
 
+resource "cachefly_service" %[1]q {
+  name        = %[1]q
+  unique_name = "%[1]s-unique"
+  description = "%[1]s test service for log target"
+}
+
 resource "cachefly_log_target" %[1]q {
-  name              = %[1]q
-  type              = "S3"
-  bucket            = "my-log-bucket"
-  region            = "us-east-1"
-  access_key        = "AKIAIOSFODNN7EXAMPLE"
-  secret_key        = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-  signature_version = "v4"
+  name               = %[1]q
+  type               = "S3_BUCKET"
+  bucket             = "my-log-bucket"
+  region             = "us-east-1"
+  access_key         = "AKIAIOSFODNN7EXAMPLE"
+  secret_key         = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+  signature_version  = "v4"
+  access_logs_services = [cachefly_service.%[1]s.id]
+  origin_logs_services = [cachefly_service.%[1]s.id]
+
+  depends_on = [cachefly_service.%[1]s]
 }
 `, name)
 }
@@ -316,6 +336,12 @@ resource "cachefly_log_target" %[1]q {
 func testAccLogTargetResourceConfigElasticsearch(name string) string {
 	return fmt.Sprintf(`
 provider "cachefly" {}
+
+resource "cachefly_service" %[1]q {
+  name        = %[1]q
+  unique_name = "%[1]s-unique"
+  description = "%[1]s test service for log target"
+}
 
 resource "cachefly_log_target" %[1]q {
   name                           = %[1]q
@@ -329,6 +355,10 @@ resource "cachefly_log_target" %[1]q {
   index                          = "cachefly-logs"
   user                           = "elastic"
   password                       = "secret-password"
+  access_logs_services           = [cachefly_service.%[1]s.id]
+  origin_logs_services           = [cachefly_service.%[1]s.id]
+
+  depends_on = [cachefly_service.%[1]s]
 }
 `, name)
 }
@@ -340,7 +370,7 @@ provider "cachefly" {}
 
 resource "cachefly_log_target" %[1]q {
   name      = %[1]q
-  type      = "GOOGLE_CLOUD_STORAGE"
+  type      = "GOOGLE_BUCKET"
   bucket    = "my-gcp-log-bucket"
   json_key  = jsonencode({
     "type": "service_account",
@@ -354,18 +384,6 @@ resource "cachefly_log_target" %[1]q {
     "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
     "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/my-service-account%%40my-project-12345.iam.gserviceaccount.com"
   })
-}
-`, name)
-}
-
-// Test configuration for minimal log target (only required fields)
-func testAccLogTargetResourceConfigMinimal(name string) string {
-	return fmt.Sprintf(`
-provider "cachefly" {}
-
-resource "cachefly_log_target" %[1]q {
-  name = %[1]q
-  type = "SYSLOG"
 }
 `, name)
 }
