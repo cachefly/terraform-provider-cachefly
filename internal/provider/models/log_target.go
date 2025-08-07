@@ -22,6 +22,8 @@ type LogTargetResourceModel struct {
 	User                       types.String `tfsdk:"user"`
 	Password                   types.String `tfsdk:"password"`
 	ApiKey                     types.String `tfsdk:"api_key"`
+	AccessLogsServices         types.List   `tfsdk:"access_logs_services"`
+	OriginLogsServices         types.List   `tfsdk:"origin_logs_services"`
 
 	// Computed fields
 	CreatedAt types.String `tfsdk:"created_at"`

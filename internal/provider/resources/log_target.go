@@ -128,7 +128,18 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 				Optional:    true,
 				Sensitive:   true,
 			},
-
+			"accessLogsServices": schema.ListAttribute{
+				Description: "List of service IDs to enable access logs for.",
+				Optional:    true,
+				ElementType: types.StringType,
+				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+			},
+			"originLogsServices": schema.ListAttribute{
+				Description: "List of service IDs to enable origin logs for.",
+				Optional:    true,
+				ElementType: types.StringType,
+				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+			},
 			"created_at": schema.StringAttribute{
 				Description: "When the log target was created.",
 				Computed:    true,
@@ -235,6 +246,39 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 			"Could not create log target, unexpected error: "+err.Error(),
 		)
 		return
+	}
+
+	var needToUpdateLogging = false
+	var enableLoggingRequest api.EnableLoggingRequest
+	if !data.AccessLogsServices.IsNull() && !data.AccessLogsServices.IsUnknown() {
+		needToUpdateLogging = true
+		var accessLogsServices []string
+		resp.Diagnostics.Append(data.AccessLogsServices.ElementsAs(ctx, &accessLogsServices, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		enableLoggingRequest.AccessLogsServices = accessLogsServices
+	}
+
+	if !data.OriginLogsServices.IsNull() && !data.OriginLogsServices.IsUnknown() {
+		needToUpdateLogging = true
+		var originLogsServices []string
+		resp.Diagnostics.Append(data.OriginLogsServices.ElementsAs(ctx, &originLogsServices, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		enableLoggingRequest.OriginLogsServices = originLogsServices
+	}
+
+	if needToUpdateLogging {
+		_, err := r.client.LogTargets.EnableLogging(ctx, logTarget.ID, enableLoggingRequest)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Enabling Logging",
+				"Could not enable logging, unexpected error: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Map response to state
