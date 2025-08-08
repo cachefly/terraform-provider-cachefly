@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -55,7 +54,7 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the log target.",
-				Required:    true,
+				Optional:    true,
 			},
 			"type": schema.StringAttribute{
 				Description: "Type of log target ('S3_BUCKET' | 'ELASTICSEARCH' | 'GOOGLE_BUCKET').",
@@ -96,20 +95,14 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 				Description: "List of hosts (for Elasticsearch log targets).",
 				Optional:    true,
 				ElementType: types.StringType,
-				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
-				Computed:    true,
 			},
 			"ssl": schema.BoolAttribute{
 				Description: "Whether to use SSL/TLS.",
 				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
 			},
 			"ssl_certificate_verification": schema.BoolAttribute{
 				Description: "Whether to verify SSL certificates.",
 				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
 			},
 			"index": schema.StringAttribute{
 				Description: "Index name (for Elasticsearch log targets).",
@@ -182,50 +175,24 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 
 	// Build create request
 	createReq := api.CreateLogTargetRequest{
-		Name: data.Name.ValueString(),
 		Type: data.Type.ValueString(),
 	}
 
 	// Optional fields
-	if !data.Endpoint.IsNull() && !data.Endpoint.IsUnknown() {
-		createReq.Endpoint = data.Endpoint.ValueString()
-	}
-	if !data.Region.IsNull() && !data.Region.IsUnknown() {
-		createReq.Region = data.Region.ValueString()
-	}
-	if !data.Bucket.IsNull() && !data.Bucket.IsUnknown() {
-		createReq.Bucket = data.Bucket.ValueString()
-	}
-	if !data.AccessKey.IsNull() && !data.AccessKey.IsUnknown() {
-		createReq.AccessKey = data.AccessKey.ValueString()
-	}
-	if !data.SecretKey.IsNull() && !data.SecretKey.IsUnknown() {
-		createReq.SecretKey = data.SecretKey.ValueString()
-	}
-	if !data.SignatureVersion.IsNull() && !data.SignatureVersion.IsUnknown() {
-		createReq.SignatureVersion = data.SignatureVersion.ValueString()
-	}
-	if !data.JsonKey.IsNull() && !data.JsonKey.IsUnknown() {
-		createReq.JsonKey = data.JsonKey.ValueString()
-	}
-	if !data.SSL.IsNull() && !data.SSL.IsUnknown() {
-		createReq.SSL = data.SSL.ValueBool()
-	}
-	if !data.SSLCertificateVerification.IsNull() && !data.SSLCertificateVerification.IsUnknown() {
-		createReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBool()
-	}
-	if !data.Index.IsNull() && !data.Index.IsUnknown() {
-		createReq.Index = data.Index.ValueString()
-	}
-	if !data.User.IsNull() && !data.User.IsUnknown() {
-		createReq.User = data.User.ValueString()
-	}
-	if !data.Password.IsNull() && !data.Password.IsUnknown() {
-		createReq.Password = data.Password.ValueString()
-	}
-	if !data.ApiKey.IsNull() && !data.ApiKey.IsUnknown() {
-		createReq.ApiKey = data.ApiKey.ValueString()
-	}
+	createReq.Name = data.Name.ValueStringPointer()
+	createReq.Endpoint = data.Endpoint.ValueStringPointer()
+	createReq.Region = data.Region.ValueStringPointer()
+	createReq.Bucket = data.Bucket.ValueStringPointer()
+	createReq.AccessKey = data.AccessKey.ValueStringPointer()
+	createReq.SecretKey = data.SecretKey.ValueStringPointer()
+	createReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
+	createReq.JsonKey = data.JsonKey.ValueStringPointer()
+	createReq.SSL = data.SSL.ValueBoolPointer()
+	createReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBoolPointer()
+	createReq.Index = data.Index.ValueStringPointer()
+	createReq.User = data.User.ValueStringPointer()
+	createReq.Password = data.Password.ValueStringPointer()
+	createReq.ApiKey = data.ApiKey.ValueStringPointer()
 
 	// Handle hosts list
 	if !data.Hosts.IsNull() && !data.Hosts.IsUnknown() {
@@ -234,7 +201,7 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		createReq.Hosts = hosts
+		createReq.Hosts = &hosts
 	}
 
 	tflog.Debug(ctx, "Creating log target", map[string]interface{}{
@@ -274,7 +241,8 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	if needToUpdateLogging {
-		_, err := r.client.LogTargets.SetLogging(ctx, logTarget.ID, setLoggingRequest)
+		var err error
+		logTarget, err = r.client.LogTargets.SetLogging(ctx, logTarget.ID, setLoggingRequest)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Enabling Logging",
@@ -286,6 +254,9 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 
 	// Map response to state
 	r.mapLogTargetToState(logTarget, &data)
+
+	// Print the data structure after mapping
+	fmt.Printf("Log target data after creation: %+v\n", data)
 
 	tflog.Debug(ctx, "Log target created successfully", map[string]interface{}{
 		"log_target_id": logTarget.ID,
@@ -333,51 +304,21 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 	// Build update request with only changed fields
 	updateReq := api.UpdateLogTargetRequest{}
 
-	if !data.Name.IsNull() && !data.Name.IsUnknown() {
-		updateReq.Name = data.Name.ValueString()
-	}
-	if !data.Type.IsNull() && !data.Type.IsUnknown() {
-		updateReq.Type = data.Type.ValueString()
-	}
-	if !data.Endpoint.IsNull() && !data.Endpoint.IsUnknown() {
-		updateReq.Endpoint = data.Endpoint.ValueString()
-	}
-	if !data.Region.IsNull() && !data.Region.IsUnknown() {
-		updateReq.Region = data.Region.ValueString()
-	}
-	if !data.Bucket.IsNull() && !data.Bucket.IsUnknown() {
-		updateReq.Bucket = data.Bucket.ValueString()
-	}
-	if !data.AccessKey.IsNull() && !data.AccessKey.IsUnknown() {
-		updateReq.AccessKey = data.AccessKey.ValueString()
-	}
-	if !data.SecretKey.IsNull() && !data.SecretKey.IsUnknown() {
-		updateReq.SecretKey = data.SecretKey.ValueString()
-	}
-	if !data.SignatureVersion.IsNull() && !data.SignatureVersion.IsUnknown() {
-		updateReq.SignatureVersion = data.SignatureVersion.ValueString()
-	}
-	if !data.JsonKey.IsNull() && !data.JsonKey.IsUnknown() {
-		updateReq.JsonKey = data.JsonKey.ValueString()
-	}
-	if !data.SSL.IsNull() && !data.SSL.IsUnknown() {
-		updateReq.SSL = data.SSL.ValueBool()
-	}
-	if !data.SSLCertificateVerification.IsNull() && !data.SSLCertificateVerification.IsUnknown() {
-		updateReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBool()
-	}
-	if !data.Index.IsNull() && !data.Index.IsUnknown() {
-		updateReq.Index = data.Index.ValueString()
-	}
-	if !data.User.IsNull() && !data.User.IsUnknown() {
-		updateReq.User = data.User.ValueString()
-	}
-	if !data.Password.IsNull() && !data.Password.IsUnknown() {
-		updateReq.Password = data.Password.ValueString()
-	}
-	if !data.ApiKey.IsNull() && !data.ApiKey.IsUnknown() {
-		updateReq.ApiKey = data.ApiKey.ValueString()
-	}
+	updateReq.Name = data.Name.ValueStringPointer()
+	updateReq.Type = data.Type.ValueStringPointer()
+	updateReq.Endpoint = data.Endpoint.ValueStringPointer()
+	updateReq.Region = data.Region.ValueStringPointer()
+	updateReq.Bucket = data.Bucket.ValueStringPointer()
+	updateReq.AccessKey = data.AccessKey.ValueStringPointer()
+	updateReq.SecretKey = data.SecretKey.ValueStringPointer()
+	updateReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
+	updateReq.JsonKey = data.JsonKey.ValueStringPointer()
+	updateReq.SSL = data.SSL.ValueBoolPointer()
+	updateReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBoolPointer()
+	updateReq.Index = data.Index.ValueStringPointer()
+	updateReq.User = data.User.ValueStringPointer()
+	updateReq.Password = data.Password.ValueStringPointer()
+	updateReq.ApiKey = data.ApiKey.ValueStringPointer()
 
 	// Handle hosts list
 	if !data.Hosts.IsNull() && !data.Hosts.IsUnknown() {
@@ -386,7 +327,7 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		updateReq.Hosts = hosts
+		updateReq.Hosts = &hosts
 	}
 
 	tflog.Debug(ctx, "Updating log target", map[string]interface{}{
@@ -470,7 +411,8 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 
 	// Update logging if needed
 	if needToUpdateLogging {
-		_, err := r.client.LogTargets.SetLogging(ctx, data.ID.ValueString(), setLoggingRequest)
+		var err error
+		logTarget, err = r.client.LogTargets.SetLogging(ctx, data.ID.ValueString(), setLoggingRequest)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Enabling Logging",
@@ -480,7 +422,6 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	}
 
-	// Map response to state
 	r.mapLogTargetToState(logTarget, &data)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -517,86 +458,40 @@ func (r *LogTargetResource) ImportState(ctx context.Context, req resource.Import
 // Helper function to map SDK LogTarget to Terraform state
 func (r *LogTargetResource) mapLogTargetToState(logTarget *api.LogTarget, data *models.LogTargetResourceModel) {
 	data.ID = types.StringValue(logTarget.ID)
-	data.Name = types.StringValue(logTarget.Name)
+	data.Name = types.StringPointerValue(logTarget.Name)
 	data.Type = types.StringValue(logTarget.Type)
 	data.CreatedAt = types.StringValue(logTarget.CreatedAt)
 	data.UpdatedAt = types.StringValue(logTarget.UpdatedAt)
 
 	// Handle optional string fields
-	if logTarget.Endpoint != "" {
-		data.Endpoint = types.StringValue(logTarget.Endpoint)
-	} else {
-		data.Endpoint = types.StringNull()
-	}
-	if logTarget.Region != "" {
-		data.Region = types.StringValue(logTarget.Region)
-	} else {
-		data.Region = types.StringNull()
-	}
-	if logTarget.Bucket != "" {
-		data.Bucket = types.StringValue(logTarget.Bucket)
-	} else {
-		data.Bucket = types.StringNull()
-	}
-	if logTarget.AccessKey != "" {
-		data.AccessKey = types.StringValue(logTarget.AccessKey)
-	} else {
-		data.AccessKey = types.StringNull()
-	}
-	if logTarget.SecretKey != "" {
-		data.SecretKey = types.StringValue(logTarget.SecretKey)
-	} else {
-		data.SecretKey = types.StringNull()
-	}
-	if logTarget.SignatureVersion != "" {
-		data.SignatureVersion = types.StringValue(logTarget.SignatureVersion)
-	} else {
-		data.SignatureVersion = types.StringNull()
-	}
-	if logTarget.JsonKey != "" {
-		data.JsonKey = types.StringValue(logTarget.JsonKey)
-	} else {
-		data.JsonKey = types.StringNull()
-	}
-	if logTarget.Index != "" {
-		data.Index = types.StringValue(logTarget.Index)
-	} else {
-		data.Index = types.StringNull()
-	}
-	if logTarget.User != "" {
-		data.User = types.StringValue(logTarget.User)
-	} else {
-		data.User = types.StringNull()
-	}
-	if logTarget.Password != "" {
-		data.Password = types.StringValue(logTarget.Password)
-	} else {
-		data.Password = types.StringNull()
-	}
-	if logTarget.ApiKey != "" {
-		data.ApiKey = types.StringValue(logTarget.ApiKey)
-	} else {
-		data.ApiKey = types.StringNull()
-	}
+	data.Endpoint = types.StringPointerValue(logTarget.Endpoint)
+	data.Region = types.StringPointerValue(logTarget.Region)
+	data.Bucket = types.StringPointerValue(logTarget.Bucket)
+	data.AccessKey = types.StringPointerValue(logTarget.AccessKey)
+	data.SecretKey = types.StringPointerValue(logTarget.SecretKey)
+	data.SignatureVersion = types.StringPointerValue(logTarget.SignatureVersion)
+	data.JsonKey = types.StringPointerValue(logTarget.JsonKey)
+	data.Index = types.StringPointerValue(logTarget.Index)
+	data.User = types.StringPointerValue(logTarget.User)
+	data.Password = types.StringPointerValue(logTarget.Password)
+	data.ApiKey = types.StringPointerValue(logTarget.ApiKey)
 
 	// Handle boolean fields
-	data.SSL = types.BoolValue(logTarget.SSL)
-	data.SSLCertificateVerification = types.BoolValue(logTarget.SSLCertificateVerification)
+	data.SSL = types.BoolPointerValue(logTarget.SSL)
+	data.SSLCertificateVerification = types.BoolPointerValue(logTarget.SSLCertificateVerification)
 
 	// Handle hosts list
-	if len(logTarget.Hosts) > 0 {
-		hostElements := make([]attr.Value, len(logTarget.Hosts))
-		for i, host := range logTarget.Hosts {
+	if logTarget.Hosts != nil && len(*logTarget.Hosts) > 0 {
+		hostElements := make([]attr.Value, len(*logTarget.Hosts))
+		for i, host := range *logTarget.Hosts {
 			hostElements[i] = types.StringValue(host)
 		}
 		data.Hosts = types.ListValueMust(types.StringType, hostElements)
-	} else {
-		data.Hosts = types.ListValueMust(types.StringType, []attr.Value{})
 	}
 
-	if len(logTarget.AccessLogsServices) > 0 {
-		accessLogsServicesElements := make([]attr.Value, len(logTarget.AccessLogsServices))
-		for i, service := range logTarget.AccessLogsServices {
+	if logTarget.AccessLogsServices != nil && len(*logTarget.AccessLogsServices) > 0 {
+		accessLogsServicesElements := make([]attr.Value, len(*logTarget.AccessLogsServices))
+		for i, service := range *logTarget.AccessLogsServices {
 			accessLogsServicesElements[i] = types.StringValue(service)
 		}
 		data.AccessLogsServices = types.ListValueMust(types.StringType, accessLogsServicesElements)
@@ -604,9 +499,9 @@ func (r *LogTargetResource) mapLogTargetToState(logTarget *api.LogTarget, data *
 		data.AccessLogsServices = types.ListValueMust(types.StringType, []attr.Value{})
 	}
 
-	if len(logTarget.OriginLogsServices) > 0 {
-		originLogsServicesElements := make([]attr.Value, len(logTarget.OriginLogsServices))
-		for i, service := range logTarget.OriginLogsServices {
+	if logTarget.OriginLogsServices != nil && len(*logTarget.OriginLogsServices) > 0 {
+		originLogsServicesElements := make([]attr.Value, len(*logTarget.OriginLogsServices))
+		for i, service := range *logTarget.OriginLogsServices {
 			originLogsServicesElements[i] = types.StringValue(service)
 		}
 		data.OriginLogsServices = types.ListValueMust(types.StringType, originLogsServicesElements)
