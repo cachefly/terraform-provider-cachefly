@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -64,7 +63,11 @@ func (r *OriginResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			},
 			"host": schema.StringAttribute{
 				Description: "Hostname of the origin server.",
-				Required:    true,
+				Optional:    true,
+			},
+			"hostname": schema.StringAttribute{
+				Description: "Hostname of the origin server.",
+				Optional:    true,
 			},
 			"scheme": schema.StringAttribute{
 				Description: "Protocol scheme (HTTP, HTTPS, or FOLLOW).",
@@ -76,19 +79,16 @@ func (r *OriginResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Description: "Whether to cache content based on query parameters.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
 			},
 			"gzip": schema.BoolAttribute{
 				Description: "Whether to enable gzip compression.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(true),
 			},
 			"ttl": schema.Int64Attribute{
 				Description: "Time to live (TTL) in seconds for cached content.",
 				Optional:    true,
 				Computed:    true,
-				Default:     int64default.StaticInt64(86400), // 24 hours
 			},
 			"missed_ttl": schema.Int64Attribute{
 				Description: "TTL in seconds for missed (404/error) responses.",
@@ -167,48 +167,21 @@ func (r *OriginResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Build create request
 	createReq := api.CreateOriginRequest{
-		Type:     data.Type.ValueString(),
-		Hostname: data.Host.ValueString(),
-	}
-
-	// Optional fields
-	if !data.Name.IsNull() && !data.Name.IsUnknown() {
-		createReq.Name = data.Name.ValueString()
-	}
-	if !data.Scheme.IsNull() && !data.Scheme.IsUnknown() {
-		createReq.Scheme = data.Scheme.ValueString()
-	}
-	if !data.CacheByQueryParam.IsNull() && !data.CacheByQueryParam.IsUnknown() {
-		createReq.CacheByQueryParam = data.CacheByQueryParam.ValueBool()
-	}
-	if !data.Gzip.IsNull() && !data.Gzip.IsUnknown() {
-		createReq.Gzip = data.Gzip.ValueBool()
-	}
-	if !data.TTL.IsNull() && !data.TTL.IsUnknown() {
-		createReq.TTL = int(data.TTL.ValueInt64())
-	}
-	if !data.MissedTTL.IsNull() && !data.MissedTTL.IsUnknown() {
-		createReq.MissedTTL = int(data.MissedTTL.ValueInt64())
-	}
-	if !data.ConnectionTimeout.IsNull() && !data.ConnectionTimeout.IsUnknown() {
-		createReq.ConnectionTimeout = int(data.ConnectionTimeout.ValueInt64())
-	}
-	if !data.TimeToFirstByteTimeout.IsNull() && !data.TimeToFirstByteTimeout.IsUnknown() {
-		createReq.TimeToFirstByteTimeout = int(data.TimeToFirstByteTimeout.ValueInt64())
-	}
-
-	// S3-specific fields
-	if !data.AccessKey.IsNull() && !data.AccessKey.IsUnknown() {
-		createReq.AccessKey = data.AccessKey.ValueString()
-	}
-	if !data.SecretKey.IsNull() && !data.SecretKey.IsUnknown() {
-		createReq.SecretKey = data.SecretKey.ValueString()
-	}
-	if !data.Region.IsNull() && !data.Region.IsUnknown() {
-		createReq.Region = data.Region.ValueString()
-	}
-	if !data.SignatureVersion.IsNull() && !data.SignatureVersion.IsUnknown() {
-		createReq.SignatureVersion = data.SignatureVersion.ValueString()
+		Type:                   data.Type.ValueString(),
+		Hostname:               data.Hostname.ValueStringPointer(),
+		Name:                   data.Name.ValueStringPointer(),
+		Host:                   data.Host.ValueStringPointer(),
+		Scheme:                 data.Scheme.ValueStringPointer(),
+		CacheByQueryParam:      data.CacheByQueryParam.ValueBoolPointer(),
+		Gzip:                   data.Gzip.ValueBoolPointer(),
+		TTL:                    data.TTL.ValueInt32Pointer(),
+		MissedTTL:              data.MissedTTL.ValueInt32Pointer(),
+		ConnectionTimeout:      data.ConnectionTimeout.ValueInt32Pointer(),
+		TimeToFirstByteTimeout: data.TimeToFirstByteTimeout.ValueInt32Pointer(),
+		AccessKey:              data.AccessKey.ValueStringPointer(),
+		SecretKey:              data.SecretKey.ValueStringPointer(),
+		Region:                 data.Region.ValueStringPointer(),
+		SignatureVersion:       data.SignatureVersion.ValueStringPointer(),
 	}
 
 	tflog.Debug(ctx, "Creating origin", map[string]interface{}{

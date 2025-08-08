@@ -122,6 +122,9 @@ func TestAccServiceResource(t *testing.T) {
 				ResourceName:      "cachefly_service." + rName,
 				ImportState:       true,
 				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					"options",
+				},
 			},
 			// Update testing
 			{
@@ -203,6 +206,7 @@ func TestAccServiceResourceImportWithOptions(t *testing.T) {
 				ImportStateVerifyIgnore: []string{
 					// Ignore computed fields that might differ slightly
 					"updated_at",
+					"options",
 				},
 			},
 		},

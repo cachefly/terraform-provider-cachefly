@@ -141,8 +141,8 @@ func TestAccOriginResource(t *testing.T) {
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "gzip", "false"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "ttl", "3600"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "missed_ttl", "600"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "connection_timeout", "30"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "time_to_first_byte_timeout", "60"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "connection_timeout", "10"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "time_to_first_byte_timeout", "10"),
 				),
 			},
 		},
@@ -200,7 +200,7 @@ func TestAccOriginResourceMinimal(t *testing.T) {
 				Config: testAccOriginResourceConfigMinimal(rName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckOriginExists("cachefly_origin."+rName),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "type", "http"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "type", "WEB"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "host", "minimal.example.com"),
 					// Check computed defaults
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "scheme", "HTTPS"),
@@ -301,8 +301,8 @@ resource "cachefly_origin" %[1]q {
   gzip                          = false
   ttl                           = 3600
   missed_ttl                    = 600
-  connection_timeout            = 30
-  time_to_first_byte_timeout    = 60
+  connection_timeout            = 10
+  time_to_first_byte_timeout    = 10
 }
 `, name)
 }
@@ -314,7 +314,7 @@ provider "cachefly" {}
 
 resource "cachefly_origin" %[1]q {
   name              = %[1]q
-  type              = "s3"
+  type              = "S3_BUCKET"
   host              = "my-bucket.s3.amazonaws.com"
   access_key        = "AKIAIOSFODNN7EXAMPLE"
   secret_key        = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
@@ -330,7 +330,7 @@ func testAccOriginResourceConfigMinimal(name string) string {
 provider "cachefly" {}
 
 resource "cachefly_origin" %[1]q {
-  type = "http"
+  type = "WEB"
   host = "minimal.example.com"
 }
 `, name)

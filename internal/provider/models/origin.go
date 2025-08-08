@@ -9,13 +9,14 @@ type OriginResourceModel struct {
 	Type                   types.String `tfsdk:"type"`
 	Name                   types.String `tfsdk:"name"`
 	Host                   types.String `tfsdk:"host"`
+	Hostname               types.String `tfsdk:"hostname"`
 	Scheme                 types.String `tfsdk:"scheme"`
 	CacheByQueryParam      types.Bool   `tfsdk:"cache_by_query_param"`
 	Gzip                   types.Bool   `tfsdk:"gzip"`
-	TTL                    types.Int64  `tfsdk:"ttl"`
-	MissedTTL              types.Int64  `tfsdk:"missed_ttl"`
-	ConnectionTimeout      types.Int64  `tfsdk:"connection_timeout"`
-	TimeToFirstByteTimeout types.Int64  `tfsdk:"time_to_first_byte_timeout"`
+	TTL                    types.Int32  `tfsdk:"ttl"`
+	MissedTTL              types.Int32  `tfsdk:"missed_ttl"`
+	ConnectionTimeout      types.Int32  `tfsdk:"connection_timeout"`
+	TimeToFirstByteTimeout types.Int32  `tfsdk:"time_to_first_byte_timeout"`
 
 	// S3-specific fields
 	AccessKey        types.String `tfsdk:"access_key"`

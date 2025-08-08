@@ -255,9 +255,6 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 	// Map response to state
 	r.mapLogTargetToState(logTarget, &data)
 
-	// Print the data structure after mapping
-	fmt.Printf("Log target data after creation: %+v\n", data)
-
 	tflog.Debug(ctx, "Log target created successfully", map[string]interface{}{
 		"log_target_id": logTarget.ID,
 		"name":          logTarget.Name,
@@ -438,6 +435,22 @@ func (r *LogTargetResource) Delete(ctx context.Context, req resource.DeleteReque
 	tflog.Debug(ctx, "Deleting log target", map[string]interface{}{
 		"log_target_id": data.ID.ValueString(),
 	})
+
+	// Best-effort: detach this log target from any services before deletion
+	// Some backends reject deletion while the log target is referenced by services
+	// Empty slices clear associations
+	setLoggingRequest := api.SetLoggingRequest{
+		AccessLogsServices: []string{},
+		OriginLogsServices: []string{},
+	}
+
+	if _, err := r.client.LogTargets.SetLogging(ctx, data.ID.ValueString(), setLoggingRequest); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Disabling Logging for Log Target",
+			"Could not disable logging prior to deletion: "+err.Error(),
+		)
+		return
+	}
 
 	err := r.client.LogTargets.DeleteByID(ctx, data.ID.ValueString())
 	if err != nil {

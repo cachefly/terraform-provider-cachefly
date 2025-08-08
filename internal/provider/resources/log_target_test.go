@@ -115,7 +115,7 @@ func TestAccLogTargetResourceS3(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckLogTargetExists("cachefly_log_target."+rName),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "S3"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "S3_BUCKET"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "bucket", "my-log-bucket"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "region", "us-east-1"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "signature_version", "v4"),
@@ -138,12 +138,25 @@ func TestAccLogTargetResourceS3(t *testing.T) {
 					"secret_key",
 				},
 			},
+			// Update testing for S3 log target
+			{
+				Config: testAccLogTargetResourceConfigS3Updated(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckLogTargetExists("cachefly_log_target."+rName),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName+"-updated"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "S3_BUCKET"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "bucket", "my-log-bucket-updated"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "region", "us-west-2"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "access_logs_services.#", "0"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "origin_logs_services.#", "0"),
+				),
+			},
 		},
 	})
 }
 
 func TestAccLogTargetResourceElasticsearch(t *testing.T) {
-	rName := "test-elasticsearch-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	rName := "test-es-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { provider.TestAccPreCheck(t) },
@@ -181,6 +194,23 @@ func TestAccLogTargetResourceElasticsearch(t *testing.T) {
 					"password",
 				},
 			},
+			// Update testing for Elasticsearch log target
+			{
+				Config: testAccLogTargetResourceConfigElasticsearchUpdated(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckLogTargetExists("cachefly_log_target."+rName),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName+"-updated"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "ELASTICSEARCH"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.#", "2"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.0", "elasticsearch3.example.com:9200"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.1", "elasticsearch4.example.com:9200"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "ssl", "false"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "ssl_certificate_verification", "false"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "index", "cachefly-logs-updated"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "access_logs_services.#", "0"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "origin_logs_services.#", "0"),
+				),
+			},
 		},
 	})
 }
@@ -199,9 +229,8 @@ func TestAccLogTargetResourceGoogleCloud(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckLogTargetExists("cachefly_log_target."+rName),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "GOOGLE_CLOUD_STORAGE"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "GOOGLE_BUCKET"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "bucket", "my-gcp-log-bucket"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "region", "us-central1"),
 					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "id"),
 					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "created_at"),
 					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "updated_at"),
@@ -216,6 +245,16 @@ func TestAccLogTargetResourceGoogleCloud(t *testing.T) {
 					// JSON key is sensitive and won't be returned in read operations
 					"json_key",
 				},
+			},
+			// Update testing for Google Cloud log target
+			{
+				Config: testAccLogTargetResourceConfigGoogleCloudUpdated(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckLogTargetExists("cachefly_log_target."+rName),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName+"-updated"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "GOOGLE_BUCKET"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "bucket", "my-gcp-log-bucket-updated"),
+				),
 			},
 		},
 	})
@@ -332,6 +371,33 @@ resource "cachefly_log_target" %[1]q {
 `, name)
 }
 
+// Test configuration for UPDATED S3 log target
+func testAccLogTargetResourceConfigS3Updated(name string) string {
+	return fmt.Sprintf(`
+provider "cachefly" {}
+
+resource "cachefly_service" %[1]q {
+  name        = %[1]q
+  unique_name = "%[1]s-unique"
+  description = "%[1]s test service for log target"
+}
+
+resource "cachefly_log_target" %[1]q {
+  name               = "%[1]s-updated"
+  type               = "S3_BUCKET"
+  bucket             = "my-log-bucket-updated"
+  region             = "us-west-2"
+  access_key         = "AKIAIOSFODNN7EXAMPLE"
+  secret_key         = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+  signature_version  = "v4"
+  access_logs_services = []
+  origin_logs_services = []
+
+  depends_on = [cachefly_service.%[1]s]
+}
+`, name)
+}
+
 // Test configuration for Elasticsearch log target
 func testAccLogTargetResourceConfigElasticsearch(name string) string {
 	return fmt.Sprintf(`
@@ -363,6 +429,37 @@ resource "cachefly_log_target" %[1]q {
 `, name)
 }
 
+// Test configuration for UPDATED Elasticsearch log target
+func testAccLogTargetResourceConfigElasticsearchUpdated(name string) string {
+	return fmt.Sprintf(`
+provider "cachefly" {}
+
+resource "cachefly_service" %[1]q {
+  name        = %[1]q
+  unique_name = "%[1]s-unique"
+  description = "%[1]s test service for log target"
+}
+
+resource "cachefly_log_target" %[1]q {
+  name                           = "%[1]s-updated"
+  type                           = "ELASTICSEARCH"
+  hosts                          = [
+    "elasticsearch3.example.com:9200",
+    "elasticsearch4.example.com:9200"
+  ]
+  ssl                            = false
+  ssl_certificate_verification   = false
+  index                          = "cachefly-logs-updated"
+  user                           = "elastic"
+  password                       = "secret-password"
+  access_logs_services           = []
+  origin_logs_services           = []
+
+  depends_on = [cachefly_service.%[1]s]
+}
+`, name)
+}
+
 // Test configuration for Google Cloud log target
 func testAccLogTargetResourceConfigGoogleCloud(name string) string {
 	return fmt.Sprintf(`
@@ -372,6 +469,31 @@ resource "cachefly_log_target" %[1]q {
   name      = %[1]q
   type      = "GOOGLE_BUCKET"
   bucket    = "my-gcp-log-bucket"
+  json_key  = jsonencode({
+    "type": "service_account",
+    "project_id": "my-project-12345",
+    "private_key_id": "key-id-12345",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDExample...\n-----END PRIVATE KEY-----\n",
+    "client_email": "my-service-account@my-project-12345.iam.gserviceaccount.com",
+    "client_id": "123456789012345678901",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/my-service-account%%40my-project-12345.iam.gserviceaccount.com"
+  })
+}
+`, name)
+}
+
+// Test configuration for UPDATED Google Cloud log target
+func testAccLogTargetResourceConfigGoogleCloudUpdated(name string) string {
+	return fmt.Sprintf(`
+provider "cachefly" {}
+
+resource "cachefly_log_target" %[1]q {
+  name      = "%[1]s-updated"
+  type      = "GOOGLE_BUCKET"
+  bucket    = "my-gcp-log-bucket-updated"
   json_key  = jsonencode({
     "type": "service_account",
     "project_id": "my-project-12345",
