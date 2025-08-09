@@ -111,7 +111,7 @@ func TestAccOriginResource(t *testing.T) {
 					testAccCheckOriginExists("cachefly_origin."+rName),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "name", rName),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "type", "WEB"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "host", "example.com"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "hostname", "example.com"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "scheme", "HTTPS"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "cache_by_query_param", "false"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "gzip", "true"),
@@ -135,7 +135,7 @@ func TestAccOriginResource(t *testing.T) {
 					testAccCheckOriginExists("cachefly_origin."+rName),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "name", rName+"-updated"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "type", "WEB"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "host", "updated.example.com"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "hostname", "updated.example.com"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "scheme", "HTTP"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "cache_by_query_param", "true"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "gzip", "false"),
@@ -163,11 +163,11 @@ func TestAccOriginResourceS3(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckOriginExists("cachefly_origin."+rName),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "name", rName),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "type", "s3"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "host", "my-bucket.s3.amazonaws.com"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "type", "S3_BUCKET"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "hostname", "my-bucket.s3.amazonaws.com"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "access_key", "AKIAIOSFODNN7EXAMPLE"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "region", "us-east-1"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "signature_version", "4"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "signature_version", "v4"),
 					resource.TestCheckResourceAttrSet("cachefly_origin."+rName, "id"),
 					resource.TestCheckResourceAttrSet("cachefly_origin."+rName, "created_at"),
 					resource.TestCheckResourceAttrSet("cachefly_origin."+rName, "updated_at"),
@@ -201,13 +201,15 @@ func TestAccOriginResourceMinimal(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckOriginExists("cachefly_origin."+rName),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "type", "WEB"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "host", "minimal.example.com"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "hostname", "minimal.example.com"),
 					// Check computed defaults
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "scheme", "HTTPS"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "scheme", "FOLLOW"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "connection_timeout", "3"),
 					resource.TestCheckResourceAttr("cachefly_origin."+rName, "cache_by_query_param", "false"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "gzip", "true"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "ttl", "86400"),
-					resource.TestCheckResourceAttr("cachefly_origin."+rName, "missed_ttl", "300"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "gzip", "false"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "ttl", "2678400"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "missed_ttl", "86400"),
+					resource.TestCheckResourceAttr("cachefly_origin."+rName, "time_to_first_byte_timeout", "3"),
 					resource.TestCheckResourceAttrSet("cachefly_origin."+rName, "id"),
 				),
 			},
@@ -277,7 +279,7 @@ provider "cachefly" {}
 resource "cachefly_origin" %[1]q {
   name                   = %[1]q
   type                   = "WEB"
-  host                   = "example.com"
+  hostname               = "example.com"
   scheme                 = "HTTPS"
   cache_by_query_param   = false
   gzip                   = true
@@ -295,7 +297,7 @@ provider "cachefly" {}
 resource "cachefly_origin" %[1]q {
   name                          = "%[1]s-updated"
   type                          = "WEB"
-  host                          = "updated.example.com"
+  hostname                          = "updated.example.com"
   scheme                        = "HTTP"
   cache_by_query_param          = true
   gzip                          = false
@@ -315,11 +317,11 @@ provider "cachefly" {}
 resource "cachefly_origin" %[1]q {
   name              = %[1]q
   type              = "S3_BUCKET"
-  host              = "my-bucket.s3.amazonaws.com"
+  hostname          = "my-bucket.s3.amazonaws.com"
   access_key        = "AKIAIOSFODNN7EXAMPLE"
   secret_key        = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
   region            = "us-east-1"
-  signature_version = "4"
+  signature_version = "v4"
 }
 `, name)
 }
@@ -331,7 +333,7 @@ provider "cachefly" {}
 
 resource "cachefly_origin" %[1]q {
   type = "WEB"
-  host = "minimal.example.com"
+  hostname = "minimal.example.com"
 }
 `, name)
 }

@@ -179,20 +179,48 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Optional fields
-	createReq.Name = data.Name.ValueStringPointer()
-	createReq.Endpoint = data.Endpoint.ValueStringPointer()
-	createReq.Region = data.Region.ValueStringPointer()
-	createReq.Bucket = data.Bucket.ValueStringPointer()
-	createReq.AccessKey = data.AccessKey.ValueStringPointer()
-	createReq.SecretKey = data.SecretKey.ValueStringPointer()
-	createReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
-	createReq.JsonKey = data.JsonKey.ValueStringPointer()
-	createReq.SSL = data.SSL.ValueBoolPointer()
-	createReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBoolPointer()
-	createReq.Index = data.Index.ValueStringPointer()
-	createReq.User = data.User.ValueStringPointer()
-	createReq.Password = data.Password.ValueStringPointer()
-	createReq.ApiKey = data.ApiKey.ValueStringPointer()
+	if !data.Name.IsUnknown() {
+		createReq.Name = data.Name.ValueStringPointer()
+	}
+	if !data.Endpoint.IsUnknown() {
+		createReq.Endpoint = data.Endpoint.ValueStringPointer()
+	}
+	if !data.Region.IsUnknown() {
+		createReq.Region = data.Region.ValueStringPointer()
+	}
+	if !data.Bucket.IsUnknown() {
+		createReq.Bucket = data.Bucket.ValueStringPointer()
+	}
+	if !data.AccessKey.IsUnknown() {
+		createReq.AccessKey = data.AccessKey.ValueStringPointer()
+	}
+	if !data.SecretKey.IsUnknown() {
+		createReq.SecretKey = data.SecretKey.ValueStringPointer()
+	}
+	if !data.SignatureVersion.IsUnknown() {
+		createReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
+	}
+	if !data.JsonKey.IsUnknown() {
+		createReq.JsonKey = data.JsonKey.ValueStringPointer()
+	}
+	if !data.SSL.IsUnknown() {
+		createReq.SSL = data.SSL.ValueBoolPointer()
+	}
+	if !data.SSLCertificateVerification.IsUnknown() {
+		createReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBoolPointer()
+	}
+	if !data.Index.IsUnknown() {
+		createReq.Index = data.Index.ValueStringPointer()
+	}
+	if !data.User.IsUnknown() {
+		createReq.User = data.User.ValueStringPointer()
+	}
+	if !data.Password.IsUnknown() {
+		createReq.Password = data.Password.ValueStringPointer()
+	}
+	if !data.ApiKey.IsUnknown() {
+		createReq.ApiKey = data.ApiKey.ValueStringPointer()
+	}
 
 	// Handle hosts list
 	if !data.Hosts.IsNull() && !data.Hosts.IsUnknown() {

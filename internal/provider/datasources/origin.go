@@ -174,47 +174,21 @@ func (d *OriginDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 func (d *OriginDataSource) mapOriginToDataSource(origin *api.Origin, data *models.OriginDataSourceModel) {
 	data.ID = types.StringValue(origin.ID)
 	data.Type = types.StringValue(origin.Type)
-	data.Name = types.StringValue(origin.Name)
-	data.Host = types.StringValue(origin.Hostname)
-	data.Scheme = types.StringValue(origin.Scheme)
-	data.CacheByQueryParam = types.BoolValue(origin.CacheByQueryParam)
-	data.Gzip = types.BoolValue(origin.Gzip)
-	data.TTL = types.Int64Value(int64(origin.TTL))
-	data.MissedTTL = types.Int64Value(int64(origin.MissedTTL))
+	data.Name = types.StringPointerValue(origin.Name)
+	data.Hostname = types.StringPointerValue(origin.Hostname)
+	data.Scheme = types.StringPointerValue(origin.Scheme)
+	data.CacheByQueryParam = types.BoolPointerValue(origin.CacheByQueryParam)
+	data.Gzip = types.BoolPointerValue(origin.Gzip)
+	data.TTL = types.Int32PointerValue(origin.TTL)
+	data.MissedTTL = types.Int32PointerValue(origin.MissedTTL)
 	data.CreatedAt = types.StringValue(origin.CreatedAt)
 	data.UpdatedAt = types.StringValue(origin.UpdatedAt)
 
-	// Handle optional timeout fields
-	if origin.ConnectionTimeout > 0 {
-		data.ConnectionTimeout = types.Int64Value(int64(origin.ConnectionTimeout))
-	} else {
-		data.ConnectionTimeout = types.Int64Null()
-	}
-	if origin.TimeToFirstByteTimeout > 0 {
-		data.TimeToFirstByteTimeout = types.Int64Value(int64(origin.TimeToFirstByteTimeout))
-	} else {
-		data.TimeToFirstByteTimeout = types.Int64Null()
-	}
+	data.ConnectionTimeout = types.Int32PointerValue(origin.ConnectionTimeout)
+	data.TimeToFirstByteTimeout = types.Int32PointerValue(origin.TimeToFirstByteTimeout)
 
-	// Handle S3-specific fields
-	if origin.AccessKey != "" {
-		data.AccessKey = types.StringValue(origin.AccessKey)
-	} else {
-		data.AccessKey = types.StringNull()
-	}
-	if origin.SecretKey != "" {
-		data.SecretKey = types.StringValue(origin.SecretKey)
-	} else {
-		data.SecretKey = types.StringNull()
-	}
-	if origin.Region != "" {
-		data.Region = types.StringValue(origin.Region)
-	} else {
-		data.Region = types.StringNull()
-	}
-	if origin.SignatureVersion != "" {
-		data.SignatureVersion = types.StringValue(origin.SignatureVersion)
-	} else {
-		data.SignatureVersion = types.StringNull()
-	}
+	data.AccessKey = types.StringPointerValue(origin.AccessKey)
+	data.SecretKey = types.StringPointerValue(origin.SecretKey)
+	data.Region = types.StringPointerValue(origin.Region)
+	data.SignatureVersion = types.StringPointerValue(origin.SignatureVersion)
 }

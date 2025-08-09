@@ -212,53 +212,23 @@ func (d *OriginsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 				"updated_at":                 types.StringType,
 			},
 			map[string]attr.Value{
-				"id":                   types.StringValue(origin.ID),
-				"type":                 types.StringValue(origin.Type),
-				"name":                 types.StringValue(origin.Name),
-				"host":                 types.StringValue(origin.Hostname),
-				"scheme":               types.StringValue(origin.Scheme),
-				"cache_by_query_param": types.BoolValue(origin.CacheByQueryParam),
-				"gzip":                 types.BoolValue(origin.Gzip),
-				"ttl":                  types.Int64Value(int64(origin.TTL)),
-				"missed_ttl":           types.Int64Value(int64(origin.MissedTTL)),
-				"connection_timeout": func() types.Int64 {
-					if origin.ConnectionTimeout > 0 {
-						return types.Int64Value(int64(origin.ConnectionTimeout))
-					}
-					return types.Int64Null()
-				}(),
-				"time_to_first_byte_timeout": func() types.Int64 {
-					if origin.TimeToFirstByteTimeout > 0 {
-						return types.Int64Value(int64(origin.TimeToFirstByteTimeout))
-					}
-					return types.Int64Null()
-				}(),
-				"access_key": func() types.String {
-					if origin.AccessKey != "" {
-						return types.StringValue(origin.AccessKey)
-					}
-					return types.StringNull()
-				}(),
-				"secret_key": func() types.String {
-					if origin.SecretKey != "" {
-						return types.StringValue(origin.SecretKey)
-					}
-					return types.StringNull()
-				}(),
-				"region": func() types.String {
-					if origin.Region != "" {
-						return types.StringValue(origin.Region)
-					}
-					return types.StringNull()
-				}(),
-				"signature_version": func() types.String {
-					if origin.SignatureVersion != "" {
-						return types.StringValue(origin.SignatureVersion)
-					}
-					return types.StringNull()
-				}(),
-				"created_at": types.StringValue(origin.CreatedAt),
-				"updated_at": types.StringValue(origin.UpdatedAt),
+				"id":                         types.StringValue(origin.ID),
+				"type":                       types.StringValue(origin.Type),
+				"name":                       types.StringPointerValue(origin.Name),
+				"host":                       types.StringPointerValue(origin.Hostname),
+				"scheme":                     types.StringPointerValue(origin.Scheme),
+				"cache_by_query_param":       types.BoolPointerValue(origin.CacheByQueryParam),
+				"gzip":                       types.BoolPointerValue(origin.Gzip),
+				"ttl":                        types.Int32PointerValue(origin.TTL),
+				"missed_ttl":                 types.Int32PointerValue(origin.MissedTTL),
+				"connection_timeout":         types.Int32PointerValue(origin.ConnectionTimeout),
+				"time_to_first_byte_timeout": types.Int32PointerValue(origin.TimeToFirstByteTimeout),
+				"access_key":                 types.StringPointerValue(origin.AccessKey),
+				"secret_key":                 types.StringPointerValue(origin.SecretKey),
+				"region":                     types.StringPointerValue(origin.Region),
+				"signature_version":          types.StringPointerValue(origin.SignatureVersion),
+				"created_at":                 types.StringValue(origin.CreatedAt),
+				"updated_at":                 types.StringValue(origin.UpdatedAt),
 			},
 		)
 		origins[i] = originObj
@@ -274,10 +244,10 @@ func (d *OriginsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 				"scheme":                     types.StringType,
 				"cache_by_query_param":       types.BoolType,
 				"gzip":                       types.BoolType,
-				"ttl":                        types.Int64Type,
-				"missed_ttl":                 types.Int64Type,
-				"connection_timeout":         types.Int64Type,
-				"time_to_first_byte_timeout": types.Int64Type,
+				"ttl":                        types.Int32Type,
+				"missed_ttl":                 types.Int32Type,
+				"connection_timeout":         types.Int32Type,
+				"time_to_first_byte_timeout": types.Int32Type,
 				"access_key":                 types.StringType,
 				"secret_key":                 types.StringType,
 				"region":                     types.StringType,

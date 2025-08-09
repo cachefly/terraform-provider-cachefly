@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -155,8 +156,14 @@ func (r *CertificateResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Convert to SDK create request
-	createReq := data.ToSDKCreateRequest(ctx)
+	createReq := api.CreateCertificateRequest{
+		Certificate:    data.Certificate.ValueString(),
+		CertificateKey: data.CertificateKey.ValueString(),
+	}
+
+	if !data.Password.IsNull() && !data.Password.IsUnknown() && data.Password.ValueString() != "" {
+		createReq.Password = data.Password.ValueString()
+	}
 
 	tflog.Debug(ctx, "Creating certificate", map[string]interface{}{
 		"has_certificate": createReq.Certificate != "",
@@ -165,7 +172,7 @@ func (r *CertificateResource) Create(ctx context.Context, req resource.CreateReq
 	})
 
 	// Create certificate via API
-	cert, err := r.client.Certificates.Create(ctx, *createReq)
+	cert, err := r.client.Certificates.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating CacheFly Certificate",
@@ -288,5 +295,47 @@ func (r *CertificateResource) ImportState(ctx context.Context, req resource.Impo
 
 // Helper function to map SDK Certificate to Terraform state
 func (r *CertificateResource) mapCertificateToState(cert *api.Certificate, data *models.CertificateModel) {
-	data.FromSDKCertificate(context.Background(), cert)
+	data.ID = types.StringValue(cert.ID)
+	data.SubjectCommonName = types.StringValue(cert.SubjectCommonName)
+	data.Expired = types.BoolValue(cert.Expired)
+	data.Expiring = types.BoolValue(cert.Expiring)
+	data.InUse = types.BoolValue(cert.InUse)
+	data.Managed = types.BoolValue(cert.Managed)
+	data.NotBefore = types.StringValue(cert.NotBefore)
+	data.NotAfter = types.StringValue(cert.NotAfter)
+	data.CreatedAt = types.StringValue(cert.CreatedAt)
+
+	// Convert SubjectNames slice to set
+	if len(cert.SubjectNames) > 0 {
+		subjectNameValues := make([]attr.Value, len(cert.SubjectNames))
+		for i, name := range cert.SubjectNames {
+			subjectNameValues[i] = types.StringValue(name)
+		}
+		data.SubjectNames = types.SetValueMust(types.StringType, subjectNameValues)
+	} else {
+		data.SubjectNames = types.SetValueMust(types.StringType, []attr.Value{})
+	}
+
+	// Convert Services slice to set
+	if len(cert.Services) > 0 {
+		serviceValues := make([]attr.Value, len(cert.Services))
+		for i, service := range cert.Services {
+			serviceValues[i] = types.StringValue(service)
+		}
+		data.Services = types.SetValueMust(types.StringType, serviceValues)
+	} else {
+		data.Services = types.SetValueMust(types.StringType, []attr.Value{})
+	}
+
+	// Convert Domains slice to set
+	if len(cert.Domains) > 0 {
+		domainValues := make([]attr.Value, len(cert.Domains))
+		for i, domain := range cert.Domains {
+			domainValues[i] = types.StringValue(domain)
+		}
+		data.Domains = types.SetValueMust(types.StringType, domainValues)
+	} else {
+		data.Domains = types.SetValueMust(types.StringType, []attr.Value{})
+	}
+
 }
