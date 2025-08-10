@@ -166,7 +166,6 @@ func TestAccServiceResourceWithOptions(t *testing.T) {
 				Config: testAccServiceResourceConfigWithUpdatedOptions(rName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckServiceExists(resourceName),
-					// Check updated option values
 					resource.TestCheckResourceAttr(resourceName, "options.autoRedirect", "false"),
 					resource.TestCheckResourceAttr(resourceName, "options.protectServeKeyEnabled", "false"),
 					resource.TestCheckResourceAttr(resourceName, "options.purgemode.enabled", "false"),

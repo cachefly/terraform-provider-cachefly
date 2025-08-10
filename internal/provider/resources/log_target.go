@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -91,7 +91,7 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 				Optional:    true,
 				Sensitive:   true,
 			},
-			"hosts": schema.ListAttribute{
+			"hosts": schema.SetAttribute{
 				Description: "List of hosts (for Elasticsearch log targets).",
 				Optional:    true,
 				ElementType: types.StringType,
@@ -122,18 +122,18 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 				Optional:    true,
 				Sensitive:   true,
 			},
-			"access_logs_services": schema.ListAttribute{
+			"access_logs_services": schema.SetAttribute{
 				Description: "List of service IDs to enable access logs for.",
 				Optional:    true,
 				ElementType: types.StringType,
-				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Computed:    true,
 			},
-			"origin_logs_services": schema.ListAttribute{
+			"origin_logs_services": schema.SetAttribute{
 				Description: "List of service IDs to enable origin logs for.",
 				Optional:    true,
 				ElementType: types.StringType,
-				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{
@@ -222,7 +222,7 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 		createReq.ApiKey = data.ApiKey.ValueStringPointer()
 	}
 
-	// Handle hosts list
+	// Handle hosts set
 	if !data.Hosts.IsNull() && !data.Hosts.IsUnknown() {
 		var hosts []string
 		resp.Diagnostics.Append(data.Hosts.ElementsAs(ctx, &hosts, false)...)
@@ -320,8 +320,14 @@ func (r *LogTargetResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.LogTargetResourceModel
+	var state models.LogTargetResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -329,24 +335,53 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 	// Build update request with only changed fields
 	updateReq := api.UpdateLogTargetRequest{}
 
-	updateReq.Name = data.Name.ValueStringPointer()
-	updateReq.Type = data.Type.ValueStringPointer()
-	updateReq.Endpoint = data.Endpoint.ValueStringPointer()
-	updateReq.Region = data.Region.ValueStringPointer()
-	updateReq.Bucket = data.Bucket.ValueStringPointer()
-	updateReq.AccessKey = data.AccessKey.ValueStringPointer()
-	updateReq.SecretKey = data.SecretKey.ValueStringPointer()
-	updateReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
-	updateReq.JsonKey = data.JsonKey.ValueStringPointer()
-	updateReq.SSL = data.SSL.ValueBoolPointer()
-	updateReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBoolPointer()
-	updateReq.Index = data.Index.ValueStringPointer()
-	updateReq.User = data.User.ValueStringPointer()
-	updateReq.Password = data.Password.ValueStringPointer()
-	updateReq.ApiKey = data.ApiKey.ValueStringPointer()
+	if !data.Name.Equal(state.Name) {
+		updateReq.Name = data.Name.ValueStringPointer()
+	}
+	if !data.Type.Equal(state.Type) {
+		updateReq.Type = data.Type.ValueStringPointer()
+	}
+	if !data.Endpoint.Equal(state.Endpoint) {
+		updateReq.Endpoint = data.Endpoint.ValueStringPointer()
+	}
+	if !data.Region.Equal(state.Region) {
+		updateReq.Region = data.Region.ValueStringPointer()
+	}
+	if !data.Bucket.Equal(state.Bucket) {
+		updateReq.Bucket = data.Bucket.ValueStringPointer()
+	}
+	if !data.AccessKey.Equal(state.AccessKey) {
+		updateReq.AccessKey = data.AccessKey.ValueStringPointer()
+	}
+	if !data.SecretKey.Equal(state.SecretKey) {
+		updateReq.SecretKey = data.SecretKey.ValueStringPointer()
+	}
+	if !data.SignatureVersion.Equal(state.SignatureVersion) {
+		updateReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
+	}
+	if !data.JsonKey.Equal(state.JsonKey) {
+		updateReq.JsonKey = data.JsonKey.ValueStringPointer()
+	}
+	if !data.SSL.Equal(state.SSL) {
+		updateReq.SSL = data.SSL.ValueBoolPointer()
+	}
+	if !data.SSLCertificateVerification.Equal(state.SSLCertificateVerification) {
+		updateReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBoolPointer()
+	}
+	if !data.Index.Equal(state.Index) {
+		updateReq.Index = data.Index.ValueStringPointer()
+	}
+	if !data.User.Equal(state.User) {
+		updateReq.User = data.User.ValueStringPointer()
+	}
+	if !data.Password.Equal(state.Password) {
+		updateReq.Password = data.Password.ValueStringPointer()
+	}
+	if !data.ApiKey.Equal(state.ApiKey) {
+		updateReq.ApiKey = data.ApiKey.ValueStringPointer()
+	}
 
-	// Handle hosts list
-	if !data.Hosts.IsNull() && !data.Hosts.IsUnknown() {
+	if !data.Hosts.Equal(state.Hosts) {
 		var hosts []string
 		resp.Diagnostics.Append(data.Hosts.ElementsAs(ctx, &hosts, false)...)
 		if resp.Diagnostics.HasError() {
@@ -354,10 +389,6 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 		updateReq.Hosts = &hosts
 	}
-
-	tflog.Debug(ctx, "Updating log target", map[string]interface{}{
-		"log_target_id": data.ID.ValueString(),
-	})
 
 	logTarget, err := r.client.LogTargets.UpdateByID(ctx, data.ID.ValueString(), updateReq)
 	if err != nil {
@@ -368,33 +399,23 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Get current state to compare with planned changes
-	var currentState models.LogTargetResourceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	var needToUpdateLogging = false
 	var setLoggingRequest api.SetLoggingRequest
 
-	// Check if AccessLogsServices has changed
 	var plannedAccessLogsServices []string
 	resp.Diagnostics.Append(data.AccessLogsServices.ElementsAs(ctx, &plannedAccessLogsServices, false)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Get current access logs services for comparison
 	var currentAccessLogsServices []string
-	if !currentState.AccessLogsServices.IsNull() && !currentState.AccessLogsServices.IsUnknown() {
-		resp.Diagnostics.Append(currentState.AccessLogsServices.ElementsAs(ctx, &currentAccessLogsServices, false)...)
+	if !state.AccessLogsServices.IsNull() && !state.AccessLogsServices.IsUnknown() {
+		resp.Diagnostics.Append(state.AccessLogsServices.ElementsAs(ctx, &currentAccessLogsServices, false)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 	}
 
-	// Compare the lists to see if they've changed
 	if !r.slicesHaveEqualElements(currentAccessLogsServices, plannedAccessLogsServices) {
 		needToUpdateLogging = true
 		setLoggingRequest.AccessLogsServices = plannedAccessLogsServices
@@ -406,23 +427,20 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 		tflog.Debug(ctx, "AccessLogsServices unchanged, skipping logging update")
 	}
 
-	// Check if OriginLogsServices has changed
 	var plannedOriginLogsServices []string
 	resp.Diagnostics.Append(data.OriginLogsServices.ElementsAs(ctx, &plannedOriginLogsServices, false)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Get current origin logs services for comparison
 	var currentOriginLogsServices []string
-	if !currentState.OriginLogsServices.IsNull() && !currentState.OriginLogsServices.IsUnknown() {
-		resp.Diagnostics.Append(currentState.OriginLogsServices.ElementsAs(ctx, &currentOriginLogsServices, false)...)
+	if !state.OriginLogsServices.IsNull() && !state.OriginLogsServices.IsUnknown() {
+		resp.Diagnostics.Append(state.OriginLogsServices.ElementsAs(ctx, &currentOriginLogsServices, false)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 	}
 
-	// Compare the lists to see if they've changed
 	if !r.slicesHaveEqualElements(currentOriginLogsServices, plannedOriginLogsServices) {
 		needToUpdateLogging = true
 		setLoggingRequest.OriginLogsServices = plannedOriginLogsServices
@@ -434,7 +452,6 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 		tflog.Debug(ctx, "OriginLogsServices unchanged, skipping logging update")
 	}
 
-	// Update logging if needed
 	if needToUpdateLogging {
 		var err error
 		logTarget, err = r.client.LogTargets.SetLogging(ctx, data.ID.ValueString(), setLoggingRequest)
@@ -527,7 +544,7 @@ func (r *LogTargetResource) mapLogTargetToState(logTarget *api.LogTarget, data *
 		for i, host := range *logTarget.Hosts {
 			hostElements[i] = types.StringValue(host)
 		}
-		data.Hosts = types.ListValueMust(types.StringType, hostElements)
+		data.Hosts = types.SetValueMust(types.StringType, hostElements)
 	}
 
 	if logTarget.AccessLogsServices != nil && len(*logTarget.AccessLogsServices) > 0 {
@@ -535,9 +552,9 @@ func (r *LogTargetResource) mapLogTargetToState(logTarget *api.LogTarget, data *
 		for i, service := range *logTarget.AccessLogsServices {
 			accessLogsServicesElements[i] = types.StringValue(service)
 		}
-		data.AccessLogsServices = types.ListValueMust(types.StringType, accessLogsServicesElements)
+		data.AccessLogsServices = types.SetValueMust(types.StringType, accessLogsServicesElements)
 	} else {
-		data.AccessLogsServices = types.ListValueMust(types.StringType, []attr.Value{})
+		data.AccessLogsServices = types.SetValueMust(types.StringType, []attr.Value{})
 	}
 
 	if logTarget.OriginLogsServices != nil && len(*logTarget.OriginLogsServices) > 0 {
@@ -545,9 +562,9 @@ func (r *LogTargetResource) mapLogTargetToState(logTarget *api.LogTarget, data *
 		for i, service := range *logTarget.OriginLogsServices {
 			originLogsServicesElements[i] = types.StringValue(service)
 		}
-		data.OriginLogsServices = types.ListValueMust(types.StringType, originLogsServicesElements)
+		data.OriginLogsServices = types.SetValueMust(types.StringType, originLogsServicesElements)
 	} else {
-		data.OriginLogsServices = types.ListValueMust(types.StringType, []attr.Value{})
+		data.OriginLogsServices = types.SetValueMust(types.StringType, []attr.Value{})
 	}
 }
 

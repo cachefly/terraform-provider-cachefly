@@ -127,26 +127,17 @@ func (r *ServiceResource) Configure(ctx context.Context, req resource.ConfigureR
 func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data models.ServiceResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Create the service request using your SDK's CreateServiceRequest
 	createReq := api.CreateServiceRequest{
 		Name:        data.Name.ValueString(),
 		UniqueName:  data.UniqueName.ValueString(),
 		Description: data.Description.ValueString(),
 	}
 
-	tflog.Debug(ctx, "Creating CacheFly service", map[string]interface{}{
-		"name":        createReq.Name,
-		"unique_name": createReq.UniqueName,
-		"description": createReq.Description,
-	})
-
-	// Create the service via SDK
 	service, err := r.client.Services.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -156,24 +147,20 @@ func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	// Check if we need to update the service with additional configuration
 	var needsUpdate bool
 	var updateReq api.UpdateServiceRequest
-
-	// Always include description in update
-	updateReq.Description = data.Description.ValueString()
 
 	if !data.AutoSSL.IsNull() && !data.AutoSSL.IsUnknown() {
 		needsUpdate = true
 		updateReq.AutoSSL = data.AutoSSL.ValueBool()
 	}
 
-	if !data.TLSProfile.IsNull() && !data.TLSProfile.IsUnknown() && data.TLSProfile.ValueString() != "" {
+	if !data.TLSProfile.IsNull() {
 		needsUpdate = true
 		updateReq.TLSProfile = data.TLSProfile.ValueString()
 	}
 
-	if !data.DeliveryRegion.IsNull() && !data.DeliveryRegion.IsUnknown() && data.DeliveryRegion.ValueString() != "" {
+	if !data.DeliveryRegion.IsNull() {
 		needsUpdate = true
 		updateReq.DeliveryRegion = data.DeliveryRegion.ValueString()
 	}
@@ -270,22 +257,33 @@ func (r *ServiceResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.ServiceResourceModel
+	var state models.ServiceResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	updateReq := api.UpdateServiceRequest{
-		Description: data.Description.ValueString(),
-		AutoSSL:     data.AutoSSL.ValueBool(),
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	// Only set optional fields if they have actual values
-	if !data.TLSProfile.IsNull() && !data.TLSProfile.IsUnknown() && data.TLSProfile.ValueString() != "" {
+	updateReq := api.UpdateServiceRequest{}
+
+	if !data.Description.Equal(state.Description) {
+		updateReq.Description = data.Description.ValueString()
+	}
+
+	if !data.AutoSSL.Equal(state.AutoSSL) {
+		updateReq.AutoSSL = data.AutoSSL.ValueBool()
+	}
+
+	if !data.TLSProfile.Equal(state.TLSProfile) {
 		updateReq.TLSProfile = data.TLSProfile.ValueString()
 	}
-	if !data.DeliveryRegion.IsNull() && !data.DeliveryRegion.IsUnknown() && data.DeliveryRegion.ValueString() != "" {
+
+	if !data.DeliveryRegion.Equal(state.DeliveryRegion) {
 		updateReq.DeliveryRegion = data.DeliveryRegion.ValueString()
 	}
 
@@ -300,7 +298,7 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	r.mapServiceToState(service, &data)
 
-	if !data.Options.IsNull() && !data.Options.IsUnknown() {
+	if !data.Options.Equal(state.Options) {
 		// Get current state to compare with planned changes
 		var currentState models.ServiceResourceModel
 		resp.Diagnostics.Append(req.State.Get(ctx, &currentState)...)
@@ -605,6 +603,7 @@ func (r *ServiceResource) compareOptionValues(current, planned interface{}) bool
 
 // IMPORTANT: to use what the API returns, not what the user configured
 func (r *ServiceResource) mapServiceToState(service *api.Service, data *models.ServiceResourceModel) {
+	fmt.Println("mapping service to state", service)
 	// Core fields - always use API response
 	data.ID = types.StringValue(service.ID)
 	data.Name = types.StringValue(service.Name)

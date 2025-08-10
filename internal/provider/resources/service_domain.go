@@ -81,7 +81,7 @@ func (r *ServiceDomainResource) Schema(ctx context.Context, req resource.SchemaR
 				Description: "The current validation status of the domain.",
 				Computed:    true,
 			},
-			"certificates": schema.ListAttribute{
+			"certificates": schema.SetAttribute{
 				Description: "List of certificate IDs associated with this domain.",
 				ElementType: types.StringType,
 				Computed:    true,
@@ -189,30 +189,29 @@ func (r *ServiceDomainResource) Read(ctx context.Context, req resource.ReadReque
 
 func (r *ServiceDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.ServiceDomainResourceModel
+	var state models.ServiceDomainResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Update the domain
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	updateReq := api.UpdateServiceDomainRequest{}
 
-	// Only include fields that have values
-	if !data.Name.IsNull() && !data.Name.IsUnknown() {
+	if !data.Name.Equal(state.Name) {
 		updateReq.Name = data.Name.ValueString()
 	}
-	if !data.Description.IsNull() && !data.Description.IsUnknown() {
+	if !data.Description.Equal(state.Description) {
 		updateReq.Description = data.Description.ValueString()
 	}
-	if !data.ValidationMode.IsNull() && !data.ValidationMode.IsUnknown() {
+	if !data.ValidationMode.Equal(state.ValidationMode) {
 		updateReq.ValidationMode = data.ValidationMode.ValueString()
 	}
-
-	tflog.Debug(ctx, "Updating service domain", map[string]interface{}{
-		"service_id": data.ServiceID.ValueString(),
-		"domain_id":  data.ID.ValueString(),
-	})
 
 	domain, err := r.client.ServiceDomains.UpdateByID(ctx, data.ServiceID.ValueString(), data.ID.ValueString(), updateReq)
 	if err != nil {
@@ -223,7 +222,6 @@ func (r *ServiceDomainResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	// Map response to state
 	r.mapDomainToState(domain, &data)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -283,14 +281,14 @@ func (r *ServiceDomainResource) mapDomainToState(domain *api.ServiceDomain, data
 	data.CreatedAt = types.StringValue(domain.CreatedAt)
 	data.UpdatedAt = types.StringValue(domain.UpdatedAt)
 
-	// Convert certificates slice to Terraform list
+	// Convert certificates slice to Terraform set
 	if len(domain.Certificates) > 0 {
 		certElements := make([]attr.Value, len(domain.Certificates))
 		for i, cert := range domain.Certificates {
 			certElements[i] = types.StringValue(cert)
 		}
-		data.Certificates, _ = types.ListValue(types.StringType, certElements)
+		data.Certificates, _ = types.SetValue(types.StringType, certElements)
 	} else {
-		data.Certificates = types.ListNull(types.StringType)
+		data.Certificates = types.SetNull(types.StringType)
 	}
 }

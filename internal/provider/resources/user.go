@@ -234,35 +234,38 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 // Update updates the resource and sets the updated Terraform state on success
 func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.UserModel
+	var state models.UserModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	userID := data.ID.ValueString()
 
-	// Build update request with only changed fields
 	updateReq := api.UpdateUserRequest{}
 
-	// Only set fields that have values (not null/unknown)
-	if !data.Password.IsNull() && !data.Password.IsUnknown() && data.Password.ValueString() != "" {
+	if !data.Password.Equal(state.Password) {
 		updateReq.Password = data.Password.ValueString()
 	}
-	if !data.Email.IsNull() && !data.Email.IsUnknown() {
+	if !data.Email.Equal(state.Email) {
 		updateReq.Email = data.Email.ValueString()
 	}
-	if !data.FullName.IsNull() && !data.FullName.IsUnknown() {
+	if !data.FullName.Equal(state.FullName) {
 		updateReq.FullName = data.FullName.ValueString()
 	}
-	if !data.Phone.IsNull() && !data.Phone.IsUnknown() {
+	if !data.Phone.Equal(state.Phone) {
 		updateReq.Phone = data.Phone.ValueString()
 	}
 
 	updateReq.PasswordChangeRequired = data.PasswordChangeRequired.ValueBoolPointer()
 
-	// Convert Services set to string slice
-	if !data.Services.IsNull() && !data.Services.IsUnknown() {
+	if !data.Services.Equal(state.Services) {
 		var services []string
 		serviceElements := make([]types.String, 0, len(data.Services.Elements()))
 		data.Services.ElementsAs(ctx, &serviceElements, false)
@@ -272,8 +275,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		updateReq.Services = services
 	}
 
-	// Convert Permissions set to string slice
-	if !data.Permissions.IsNull() && !data.Permissions.IsUnknown() {
+	if !data.Permissions.Equal(state.Permissions) {
 		var permissions []string
 		permissionElements := make([]types.String, 0, len(data.Permissions.Elements()))
 		data.Permissions.ElementsAs(ctx, &permissionElements, false)
@@ -282,10 +284,6 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		}
 		updateReq.Permissions = permissions
 	}
-
-	tflog.Debug(ctx, "Updating user", map[string]interface{}{
-		"user_id": userID,
-	})
 
 	user, err := r.client.Users.UpdateByID(ctx, userID, updateReq)
 	if err != nil {
@@ -296,13 +294,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	// Map response to state
 	r.mapUserToState(user, &data)
-
-	tflog.Debug(ctx, "User updated successfully", map[string]interface{}{
-		"user_id":  user.ID,
-		"username": user.Username,
-	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

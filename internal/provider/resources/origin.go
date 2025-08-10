@@ -260,39 +260,67 @@ func (r *OriginResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 func (r *OriginResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.OriginResourceModel
+	var state models.OriginResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	updateReq := api.UpdateOriginRequest{
-		Type:                   data.Type.ValueStringPointer(),
-		Name:                   data.Name.ValueStringPointer(),
-		Scheme:                 data.Scheme.ValueStringPointer(),
-		CacheByQueryParam:      data.CacheByQueryParam.ValueBoolPointer(),
-		Gzip:                   data.Gzip.ValueBoolPointer(),
-		TTL:                    data.TTL.ValueInt32Pointer(),
-		MissedTTL:              data.MissedTTL.ValueInt32Pointer(),
-		ConnectionTimeout:      data.ConnectionTimeout.ValueInt32Pointer(),
-		TimeToFirstByteTimeout: data.TimeToFirstByteTimeout.ValueInt32Pointer(),
-		AccessKey:              data.AccessKey.ValueStringPointer(),
-		SecretKey:              data.SecretKey.ValueStringPointer(),
-		Region:                 data.Region.ValueStringPointer(),
-		SignatureVersion:       data.SignatureVersion.ValueStringPointer(),
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	if !data.Hostname.IsUnknown() {
+	updateReq := api.UpdateOriginRequest{}
+
+	if !data.Type.Equal(state.Type) {
+		updateReq.Type = data.Type.ValueStringPointer()
+	}
+	if !data.Name.Equal(state.Name) {
+		updateReq.Name = data.Name.ValueStringPointer()
+	}
+	if !data.Scheme.Equal(state.Scheme) {
+		updateReq.Scheme = data.Scheme.ValueStringPointer()
+	}
+	if !data.CacheByQueryParam.Equal(state.CacheByQueryParam) {
+		updateReq.CacheByQueryParam = data.CacheByQueryParam.ValueBoolPointer()
+	}
+	if !data.Gzip.Equal(state.Gzip) {
+		updateReq.Gzip = data.Gzip.ValueBoolPointer()
+	}
+	if !data.TTL.Equal(state.TTL) {
+		updateReq.TTL = data.TTL.ValueInt32Pointer()
+	}
+	if !data.MissedTTL.Equal(state.MissedTTL) {
+		updateReq.MissedTTL = data.MissedTTL.ValueInt32Pointer()
+	}
+	if !data.ConnectionTimeout.Equal(state.ConnectionTimeout) {
+		updateReq.ConnectionTimeout = data.ConnectionTimeout.ValueInt32Pointer()
+	}
+	if !data.TimeToFirstByteTimeout.Equal(state.TimeToFirstByteTimeout) {
+		updateReq.TimeToFirstByteTimeout = data.TimeToFirstByteTimeout.ValueInt32Pointer()
+	}
+	if !data.AccessKey.Equal(state.AccessKey) {
+		updateReq.AccessKey = data.AccessKey.ValueStringPointer()
+	}
+	if !data.SecretKey.Equal(state.SecretKey) {
+		updateReq.SecretKey = data.SecretKey.ValueStringPointer()
+	}
+	if !data.Region.Equal(state.Region) {
+		updateReq.Region = data.Region.ValueStringPointer()
+	}
+	if !data.SignatureVersion.Equal(state.SignatureVersion) {
+		updateReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
+	}
+
+	if !data.Hostname.Equal(state.Hostname) {
 		if data.Type.ValueString() == "WEB" {
 			updateReq.Hostname = data.Hostname.ValueStringPointer()
 		} else {
 			updateReq.Host = data.Hostname.ValueStringPointer()
 		}
 	}
-
-	tflog.Debug(ctx, "Updating origin", map[string]interface{}{
-		"origin_id": data.ID.ValueString(),
-	})
 
 	origin, err := r.client.Origins.UpdateByID(ctx, data.ID.ValueString(), updateReq)
 	if err != nil {
@@ -303,7 +331,6 @@ func (r *OriginResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// Map response to state
 	r.mapOriginToState(origin, &data)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -317,10 +344,6 @@ func (r *OriginResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	tflog.Debug(ctx, "Deleting origin", map[string]interface{}{
-		"origin_id": data.ID.ValueString(),
-	})
-
 	err := r.client.Origins.Delete(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -330,7 +353,6 @@ func (r *OriginResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	tflog.Debug(ctx, "Origin deleted successfully")
 }
 
 func (r *OriginResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

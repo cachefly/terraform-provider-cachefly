@@ -66,7 +66,7 @@ func (d *ServiceDomainDataSource) Schema(ctx context.Context, req datasource.Sch
 				Description: "The current validation status of the domain.",
 				Computed:    true,
 			},
-			"certificates": schema.ListAttribute{
+			"certificates": schema.SetAttribute{
 				Description: "List of certificate IDs associated with this domain.",
 				ElementType: types.StringType,
 				Computed:    true,
@@ -150,14 +150,14 @@ func (d *ServiceDomainDataSource) mapDomainToDataSource(domain *api.ServiceDomai
 	data.CreatedAt = types.StringValue(domain.CreatedAt)
 	data.UpdatedAt = types.StringValue(domain.UpdatedAt)
 
-	// Convert certificates slice to Terraform list
+	// Convert certificates slice to Terraform set
 	if len(domain.Certificates) > 0 {
 		certElements := make([]attr.Value, len(domain.Certificates))
 		for i, cert := range domain.Certificates {
 			certElements[i] = types.StringValue(cert)
 		}
-		data.Certificates, _ = types.ListValue(types.StringType, certElements)
+		data.Certificates, _ = types.SetValue(types.StringType, certElements)
 	} else {
-		data.Certificates = types.ListNull(types.StringType)
+		data.Certificates = types.SetNull(types.StringType)
 	}
 }

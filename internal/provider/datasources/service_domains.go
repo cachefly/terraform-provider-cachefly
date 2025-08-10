@@ -87,7 +87,7 @@ func (d *ServiceDomainsDataSource) Schema(ctx context.Context, req datasource.Sc
 							Description: "The current validation status of the domain.",
 							Computed:    true,
 						},
-						"certificates": schema.ListAttribute{
+						"certificates": schema.SetAttribute{
 							Description: "List of certificate IDs associated with this domain.",
 							ElementType: types.StringType,
 							Computed:    true,
@@ -164,15 +164,15 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 	domains := make([]attr.Value, len(domainsResp.Domains))
 	for i, domain := range domainsResp.Domains {
 		// Convert certificates to list
-		var certsList types.List
+		var certsList types.Set
 		if len(domain.Certificates) > 0 {
 			certElements := make([]attr.Value, len(domain.Certificates))
 			for j, cert := range domain.Certificates {
 				certElements[j] = types.StringValue(cert)
 			}
-			certsList, _ = types.ListValue(types.StringType, certElements)
+			certsList, _ = types.SetValue(types.StringType, certElements)
 		} else {
-			certsList = types.ListNull(types.StringType)
+			certsList = types.SetNull(types.StringType)
 		}
 
 		domainObj, _ := types.ObjectValue(
@@ -183,7 +183,7 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 				"validation_mode":   types.StringType,
 				"validation_target": types.StringType,
 				"validation_status": types.StringType,
-				"certificates":      types.ListType{ElemType: types.StringType},
+				"certificates":      types.SetType{ElemType: types.StringType},
 				"created_at":        types.StringType,
 				"updated_at":        types.StringType,
 			},
@@ -202,7 +202,7 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 		domains[i] = domainObj
 	}
 
-	domainsList, diags := types.ListValue(
+	domainsSet, diags := types.SetValue(
 		types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"id":                types.StringType,
@@ -211,7 +211,7 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 				"validation_mode":   types.StringType,
 				"validation_target": types.StringType,
 				"validation_status": types.StringType,
-				"certificates":      types.ListType{ElemType: types.StringType},
+				"certificates":      types.SetType{ElemType: types.StringType},
 				"created_at":        types.StringType,
 				"updated_at":        types.StringType,
 			},
@@ -223,7 +223,7 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	data.Domains = domainsList
+	data.Domains = domainsSet
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
