@@ -158,10 +158,14 @@ func (r *ServiceDomainResource) Read(ctx context.Context, req resource.ReadReque
 
 	domain, err := r.client.ServiceDomains.GetByID(ctx, data.ServiceID.ValueString(), data.ID.ValueString(), "")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Service Domain",
-			"Could not read service domain ID "+data.ID.ValueString()+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Service Domain",
+				"Could not read service domain ID "+data.ID.ValueString()+": "+err.Error(),
+			)
+		}
 		return
 	}
 

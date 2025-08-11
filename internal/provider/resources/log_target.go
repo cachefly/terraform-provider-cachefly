@@ -4,6 +4,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -288,10 +289,14 @@ func (r *LogTargetResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	logTarget, err := r.client.LogTargets.GetByID(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Log Target",
-			"Could not read log target ID "+data.ID.ValueString()+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "API error 404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Log Target",
+				"Could not read log target ID "+data.ID.ValueString()+": "+err.Error(),
+			)
+		}
 		return
 	}
 

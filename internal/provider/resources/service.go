@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -238,10 +239,14 @@ func (r *ServiceResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	service, err := r.client.Services.GetByID(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Service",
-			"Could not read service ID "+data.ID.ValueString()+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Service",
+				"Could not read service ID "+data.ID.ValueString()+": "+err.Error(),
+			)
+		}
 		return
 	}
 

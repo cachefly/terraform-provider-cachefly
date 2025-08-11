@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -190,10 +191,14 @@ func (r *CertificateResource) Read(ctx context.Context, req resource.ReadRequest
 
 	cert, err := r.client.Certificates.GetByID(ctx, certID, "")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Certificate",
-			"Could not read certificate with ID "+certID+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Certificate",
+				"Could not read certificate with ID "+certID+": "+err.Error(),
+			)
+		}
 		return
 	}
 

@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -203,10 +204,14 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	user, err := r.client.Users.GetByID(ctx, userID, "")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly User",
-			"Could not read user with ID "+userID+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly User",
+				"Could not read user with ID "+userID+": "+err.Error(),
+			)
+		}
 		return
 	}
 

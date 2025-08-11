@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -185,10 +186,14 @@ func (r *ScriptConfigResource) Read(ctx context.Context, req resource.ReadReques
 
 	config, err := r.client.ScriptConfigs.GetByID(ctx, configID, "")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Script Config",
-			"Could not read script config with ID "+configID+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Script Config",
+				"Could not read script config with ID "+configID+": "+err.Error(),
+			)
+		}
 		return
 	}
 

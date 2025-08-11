@@ -4,6 +4,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -229,10 +230,14 @@ func (r *OriginResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	origin, err := r.client.Origins.GetByID(ctx, data.ID.ValueString(), "")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Origin",
-			"Could not read origin ID "+data.ID.ValueString()+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Origin",
+				"Could not read origin ID "+data.ID.ValueString()+": "+err.Error(),
+			)
+		}
 		return
 	}
 
