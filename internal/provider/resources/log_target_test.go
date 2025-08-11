@@ -49,8 +49,8 @@ func TestLogTargetResourceSchema(t *testing.T) {
 	assert.Contains(t, attrs, "user")
 	assert.Contains(t, attrs, "password")
 	assert.Contains(t, attrs, "api_key")
-	assert.Contains(t, attrs, "accessLogsServices")
-	assert.Contains(t, attrs, "originLogsServices")
+	assert.Contains(t, attrs, "access_logs_services")
+	assert.Contains(t, attrs, "origin_logs_services")
 
 	// computed attributes exist
 	assert.Contains(t, attrs, "created_at")
@@ -272,7 +272,6 @@ func testAccCheckLogTargetExists(resourceName string) resource.TestCheckFunc {
 			return fmt.Errorf("No Log Target ID is set")
 		}
 
-		fmt.Printf("rs.Primary.ID: %s\n", rs.Primary.ID)
 		sdkClient := provider.GetSDKClient()
 		if sdkClient == nil {
 			return fmt.Errorf("Failed to create CacheFly client")

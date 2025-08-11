@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -232,11 +231,6 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 		createReq.Hosts = &hosts
 	}
 
-	tflog.Debug(ctx, "Creating log target", map[string]interface{}{
-		"name": createReq.Name,
-		"type": createReq.Type,
-	})
-
 	logTarget, err := r.client.LogTargets.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -280,14 +274,7 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 		}
 	}
 
-	// Map response to state
 	r.mapLogTargetToState(logTarget, &data)
-
-	tflog.Debug(ctx, "Log target created successfully", map[string]interface{}{
-		"log_target_id": logTarget.ID,
-		"name":          logTarget.Name,
-	})
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -298,10 +285,6 @@ func (r *LogTargetResource) Read(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	tflog.Debug(ctx, "Reading log target", map[string]interface{}{
-		"log_target_id": data.ID.ValueString(),
-	})
 
 	logTarget, err := r.client.LogTargets.GetByID(ctx, data.ID.ValueString())
 	if err != nil {
@@ -419,12 +402,6 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 	if !r.slicesHaveEqualElements(currentAccessLogsServices, plannedAccessLogsServices) {
 		needToUpdateLogging = true
 		setLoggingRequest.AccessLogsServices = plannedAccessLogsServices
-		tflog.Debug(ctx, "AccessLogsServices changed, will update logging", map[string]interface{}{
-			"current_services": currentAccessLogsServices,
-			"planned_services": plannedAccessLogsServices,
-		})
-	} else {
-		tflog.Debug(ctx, "AccessLogsServices unchanged, skipping logging update")
 	}
 
 	var plannedOriginLogsServices []string
@@ -444,12 +421,6 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 	if !r.slicesHaveEqualElements(currentOriginLogsServices, plannedOriginLogsServices) {
 		needToUpdateLogging = true
 		setLoggingRequest.OriginLogsServices = plannedOriginLogsServices
-		tflog.Debug(ctx, "OriginLogsServices changed, will update logging", map[string]interface{}{
-			"current_services": currentOriginLogsServices,
-			"planned_services": plannedOriginLogsServices,
-		})
-	} else {
-		tflog.Debug(ctx, "OriginLogsServices unchanged, skipping logging update")
 	}
 
 	if needToUpdateLogging {
@@ -477,13 +448,6 @@ func (r *LogTargetResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	tflog.Debug(ctx, "Deleting log target", map[string]interface{}{
-		"log_target_id": data.ID.ValueString(),
-	})
-
-	// Best-effort: detach this log target from any services before deletion
-	// Some backends reject deletion while the log target is referenced by services
-	// Empty slices clear associations
 	setLoggingRequest := api.SetLoggingRequest{
 		AccessLogsServices: []string{},
 		OriginLogsServices: []string{},
@@ -505,8 +469,6 @@ func (r *LogTargetResource) Delete(ctx context.Context, req resource.DeleteReque
 		)
 		return
 	}
-
-	tflog.Debug(ctx, "Log target deleted successfully")
 }
 
 func (r *LogTargetResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

@@ -38,12 +38,13 @@ type ServiceDataSourceModel struct {
 	ResponseType    types.String `tfsdk:"response_type"`
 	IncludeFeatures types.Bool   `tfsdk:"include_features"`
 
-	Name              types.String `tfsdk:"name"`
-	AutoSSL           types.Bool   `tfsdk:"auto_ssl"`
-	ConfigurationMode types.String `tfsdk:"configuration_mode"`
-	Status            types.String `tfsdk:"status"`
-	CreatedAt         types.String `tfsdk:"created_at"`
-	UpdatedAt         types.String `tfsdk:"updated_at"`
+	Name              types.String  `tfsdk:"name"`
+	AutoSSL           types.Bool    `tfsdk:"auto_ssl"`
+	ConfigurationMode types.String  `tfsdk:"configuration_mode"`
+	Options           types.Dynamic `tfsdk:"options"`
+	Status            types.String  `tfsdk:"status"`
+	CreatedAt         types.String  `tfsdk:"created_at"`
+	UpdatedAt         types.String  `tfsdk:"updated_at"`
 }
 
 type ServicesDataSourceModel struct {

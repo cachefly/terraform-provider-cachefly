@@ -32,7 +32,7 @@ func TestOriginResourceSchema(t *testing.T) {
 	attrs := resp.Schema.Attributes
 	assert.Contains(t, attrs, "id")
 	assert.Contains(t, attrs, "type")
-	assert.Contains(t, attrs, "host")
+	assert.Contains(t, attrs, "hostname")
 
 	// optional attributes exist
 	assert.Contains(t, attrs, "name")
@@ -229,7 +229,6 @@ func testAccCheckOriginExists(resourceName string) resource.TestCheckFunc {
 			return fmt.Errorf("No Origin ID is set")
 		}
 
-		fmt.Printf("rs.Primary.ID: %s\n", rs.Primary.ID)
 		sdkClient := provider.GetSDKClient()
 		if sdkClient == nil {
 			return fmt.Errorf("Failed to create CacheFly client")

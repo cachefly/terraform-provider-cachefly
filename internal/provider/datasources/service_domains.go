@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -132,12 +131,6 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	tflog.Debug(ctx, "Reading service domains data source", map[string]interface{}{
-		"service_id": data.ServiceID.ValueString(),
-		"search":     data.Search.ValueString(),
-	})
-
-	// Build options
 	opts := api.ListServiceDomainsOptions{
 		Search:       data.Search.ValueString(),
 		ResponseType: data.ResponseType.ValueString(),

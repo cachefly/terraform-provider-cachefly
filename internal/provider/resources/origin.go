@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -206,12 +205,6 @@ func (r *OriginResource) Create(ctx context.Context, req resource.CreateRequest,
 		createReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
 	}
 
-	tflog.Debug(ctx, "Creating origin", map[string]interface{}{
-		"type":     createReq.Type,
-		"hostname": createReq.Hostname,
-		"name":     createReq.Name,
-	})
-
 	origin, err := r.client.Origins.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -223,11 +216,6 @@ func (r *OriginResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	r.mapOriginToState(origin, &data)
 
-	tflog.Debug(ctx, "Origin created successfully", map[string]interface{}{
-		"origin_id": origin.ID,
-		"hostname":  origin.Hostname,
-	})
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -238,10 +226,6 @@ func (r *OriginResource) Read(ctx context.Context, req resource.ReadRequest, res
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	tflog.Debug(ctx, "Reading origin", map[string]interface{}{
-		"origin_id": data.ID.ValueString(),
-	})
 
 	origin, err := r.client.Origins.GetByID(ctx, data.ID.ValueString(), "")
 	if err != nil {

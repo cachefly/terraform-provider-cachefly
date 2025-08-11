@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -54,6 +53,9 @@ func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"name": schema.StringAttribute{
 				Description: "The display name of the service.",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"unique_name": schema.StringAttribute{
 				Description: "The unique name of the service used in URLs and configurations. Must be unique across all services.",
@@ -91,8 +93,10 @@ func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest
 				// Computed:    true,
 			},
 			"status": schema.StringAttribute{
-				Description: "The current status of the service.",
-				Computed:    true,
+				MarkdownDescription: "The current status of the service. Set this to 'ACTIVE' to activate the service or 'DEACTIVATED' to deactivate it.",
+				Description:         "The current status of the service.",
+				Computed:            true,
+				Optional:            true,
 			},
 			"created_at": schema.StringAttribute{
 				Description: "The timestamp when the service was created.",
@@ -176,8 +180,17 @@ func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 
 		service = updatedService
-	} else {
-		tflog.Debug(ctx, "Skipping service configuration update - no optional fields provided")
+	}
+
+	if data.Status.ValueString() == "DEACTIVATED" {
+		service, err = r.client.Services.DeactivateServiceByID(ctx, service.ID)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Deactivating CacheFly Service",
+				"Could not deactivate service: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	if !data.Options.IsNull() && !data.Options.IsUnknown() {
@@ -209,15 +222,8 @@ func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 	}
 
-	// Map response to Terraform state
 	r.mapServiceToState(service, &data)
 
-	tflog.Debug(ctx, "Created CacheFly service", map[string]interface{}{
-		"id":     service.ID,
-		"status": service.Status,
-	})
-
-	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -296,6 +302,28 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	if !data.Status.Equal(state.Status) {
+		if data.Status.ValueString() == "ACTIVE" {
+			service, err = r.client.Services.ActivateServiceByID(ctx, data.ID.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error Activating CacheFly Service",
+					"Could not activate service: "+err.Error(),
+				)
+				return
+			}
+		} else {
+			service, err = r.client.Services.DeactivateServiceByID(ctx, data.ID.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error Deactivating CacheFly Service",
+					"Could not deactivate service: "+err.Error(),
+				)
+				return
+			}
+		}
+	}
+
 	r.mapServiceToState(service, &data)
 
 	if !data.Options.Equal(state.Options) {
@@ -338,13 +366,7 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 			}
 		}
 
-		// Only update if there are actual changes
 		if len(changedOptions) > 0 {
-			tflog.Debug(ctx, "Updating changed service options", map[string]interface{}{
-				"service_id":      data.ID.ValueString(),
-				"changed_options": len(changedOptions),
-			})
-
 			_, err = r.client.ServiceOptions.UpdateOptions(ctx, data.ID.ValueString(), changedOptions)
 			if err != nil {
 				resp.Diagnostics.AddError(
@@ -353,8 +375,6 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 				)
 				return
 			}
-		} else {
-			tflog.Debug(ctx, "No service options changes detected, skipping update")
 		}
 	}
 
@@ -364,17 +384,11 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 func (r *ServiceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data models.ServiceResourceModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "Deleting CacheFly service", map[string]interface{}{
-		"id": data.ID.ValueString(),
-	})
-
-	// First deactivate the service before deletion using your SDK's DeactivateServiceByID
 	_, err := r.client.Services.DeactivateServiceByID(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -384,11 +398,10 @@ func (r *ServiceResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	// we do not have delete, so we are using deactivate
-
-	tflog.Debug(ctx, "Deactivated CacheFly service", map[string]interface{}{
-		"id": data.ID.ValueString(),
-	})
+	resp.Diagnostics.AddWarning(
+		"Resource deactivated, not deleted",
+		"The backing service was deactivated because hard delete is not supported by the API.",
+	)
 }
 
 func (r *ServiceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -397,24 +410,25 @@ func (r *ServiceResource) ImportState(ctx context.Context, req resource.ImportSt
 
 func (r *ServiceResource) handleServiceOptionsRead(ctx context.Context, data *models.ServiceResourceModel) error {
 	serviceID := data.ID.ValueString()
-	if data.Options.IsNull() || data.Options.IsUnknown() {
-		if r.isPostImportRead(data) {
-			allOptions, err := r.client.ServiceOptions.GetOptions(ctx, serviceID)
-			if err != nil {
-				return fmt.Errorf("could not read service options for imported service: %w", err)
-			}
+	// if data.Options.IsNull() || data.Options.IsUnknown() {
+	// 	if r.isPostImportRead(data) {
+	// 		allOptions, err := r.client.ServiceOptions.GetOptions(ctx, serviceID)
+	// 		if err != nil {
+	// 			return fmt.Errorf("could not read service options for imported service: %w", err)
+	// 		}
 
-			if err := r.setOptionsFromAPI(data, allOptions); err != nil {
-				return fmt.Errorf("could not convert service options: %w", err)
-			}
+	// 		if err := r.setOptionsFromAPI(data, allOptions); err != nil {
+	// 			return fmt.Errorf("could not convert service options: %w", err)
+	// 		}
 
-			tflog.Debug(ctx, "Loaded all service options for imported resource", map[string]interface{}{
-				"service_id":    serviceID,
-				"options_count": len(allOptions),
-			})
-		}
-		return nil
-	}
+	// 		tflog.Debug(ctx, "Loaded all service options for imported resource", map[string]interface{}{
+	// 			"service_id":    serviceID,
+
+	// 			"options_count": len(allOptions),
+	// 		})
+	// 	}
+	// 	return nil
+	// }
 
 	currentOptions, err := data.ToAPIServiceOptions()
 	if err != nil {
@@ -437,11 +451,6 @@ func (r *ServiceResource) handleServiceOptionsRead(ctx context.Context, data *mo
 	if err := r.setOptionsFromAPI(data, managedOptions); err != nil {
 		return fmt.Errorf("could not convert managed options: %w", err)
 	}
-
-	tflog.Debug(ctx, "Refreshed managed service options", map[string]interface{}{
-		"service_id":    serviceID,
-		"options_count": len(managedOptions),
-	})
 
 	return nil
 }
@@ -603,7 +612,6 @@ func (r *ServiceResource) compareOptionValues(current, planned interface{}) bool
 
 // IMPORTANT: to use what the API returns, not what the user configured
 func (r *ServiceResource) mapServiceToState(service *api.Service, data *models.ServiceResourceModel) {
-	fmt.Println("mapping service to state", service)
 	// Core fields - always use API response
 	data.ID = types.StringValue(service.ID)
 	data.Name = types.StringValue(service.Name)

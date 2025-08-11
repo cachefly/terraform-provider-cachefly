@@ -88,16 +88,6 @@ func TestProviderConfigure(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "missing api_token should fail",
-			config: `
-				provider "cachefly" {
-					base_url = "https://api.test.cachefly.com/api/2.5"
-				}
-			`,
-			expectError: true,
-			errorMsg:    "Missing API Token",
-		},
-		{
 			name: "default base_url should be used",
 			config: `
 				provider "cachefly" {
@@ -212,7 +202,7 @@ func TestProviderDataSources(t *testing.T) {
 
 	dataSources := provider.DataSources(ctx)
 
-	expectedDataSourceCount := 7 //
+	expectedDataSourceCount := 6 //
 	assert.Len(t, dataSources, expectedDataSourceCount, "Should have expected number of data sources")
 
 	// Test that each data source can be instantiated

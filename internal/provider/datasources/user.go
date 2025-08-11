@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -167,13 +166,6 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	if !data.ResponseType.IsNull() && !data.ResponseType.IsUnknown() {
 		opts.ResponseType = data.ResponseType.ValueString()
 	}
-
-	tflog.Debug(ctx, "Fetching users list", map[string]interface{}{
-		"search": opts.Search,
-		"offset": opts.Offset,
-		"limit":  opts.Limit,
-	})
-
 	// Fetch users from API
 	usersResp, err := d.client.Users.List(ctx, opts)
 	if err != nil {
@@ -189,11 +181,6 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 	// Set computed ID
 	data.ID = types.StringValue("users")
-
-	tflog.Debug(ctx, "Users fetched successfully", map[string]interface{}{
-		"count": len(usersResp.Users),
-		"total": usersResp.Meta.Count,
-	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

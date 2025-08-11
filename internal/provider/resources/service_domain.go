@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -134,11 +133,6 @@ func (r *ServiceDomainResource) Create(ctx context.Context, req resource.CreateR
 		createReq.ValidationMode = data.ValidationMode.ValueString()
 	}
 
-	tflog.Debug(ctx, "Creating service domain", map[string]interface{}{
-		"service_id": data.ServiceID.ValueString(),
-		"name":       data.Name.ValueString(),
-	})
-
 	domain, err := r.client.ServiceDomains.Create(ctx, data.ServiceID.ValueString(), createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -151,11 +145,6 @@ func (r *ServiceDomainResource) Create(ctx context.Context, req resource.CreateR
 	// Map response to state
 	r.mapDomainToState(domain, &data)
 
-	tflog.Debug(ctx, "Service domain created successfully", map[string]interface{}{
-		"domain_id": domain.ID,
-		"name":      domain.Name,
-	})
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -166,11 +155,6 @@ func (r *ServiceDomainResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	tflog.Debug(ctx, "Reading service domain", map[string]interface{}{
-		"service_id": data.ServiceID.ValueString(),
-		"domain_id":  data.ID.ValueString(),
-	})
 
 	domain, err := r.client.ServiceDomains.GetByID(ctx, data.ServiceID.ValueString(), data.ID.ValueString(), "")
 	if err != nil {
@@ -235,11 +219,6 @@ func (r *ServiceDomainResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	tflog.Debug(ctx, "Deleting service domain", map[string]interface{}{
-		"service_id": data.ServiceID.ValueString(),
-		"domain_id":  data.ID.ValueString(),
-	})
-
 	err := r.client.ServiceDomains.DeleteByID(ctx, data.ServiceID.ValueString(), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -248,8 +227,6 @@ func (r *ServiceDomainResource) Delete(ctx context.Context, req resource.DeleteR
 		)
 		return
 	}
-
-	tflog.Debug(ctx, "Service domain deleted successfully")
 }
 
 func (r *ServiceDomainResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

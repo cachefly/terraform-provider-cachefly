@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -139,17 +138,8 @@ func (r *ScriptConfigResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Convert to SDK create request
 	createReq := data.ToSDKCreateRequest(ctx)
 
-	tflog.Debug(ctx, "Creating script config", map[string]interface{}{
-		"name":                     createReq.Name,
-		"script_config_definition": createReq.ScriptConfigDefinition,
-		"mime_type":                createReq.MimeType,
-		"services_count":           len(createReq.Services),
-	})
-
-	// Create script config via API
 	config, err := r.client.ScriptConfigs.Create(ctx, *createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -162,11 +152,6 @@ func (r *ScriptConfigResource) Create(ctx context.Context, req resource.CreateRe
 	// Activate the script config if requested (default is true)
 	shouldActivate := !data.Activated.IsNull() && !data.Activated.IsUnknown() && data.Activated.ValueBool()
 	if shouldActivate {
-		tflog.Debug(ctx, "Activating script config", map[string]interface{}{
-			"config_id": config.ID,
-		})
-
-		fmt.Println("Activating script config", config.ID)
 		activatedConfig, err := r.client.ScriptConfigs.ActivateByID(ctx, config.ID)
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -184,13 +169,6 @@ func (r *ScriptConfigResource) Create(ctx context.Context, req resource.CreateRe
 	// Set activation status in state
 	data.Activated = types.BoolValue(shouldActivate)
 
-	tflog.Debug(ctx, "Script config created successfully", map[string]interface{}{
-		"config_id": config.ID,
-		"name":      config.Name,
-		"purpose":   config.Purpose,
-		"activated": shouldActivate,
-	})
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -204,10 +182,6 @@ func (r *ScriptConfigResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	configID := data.ID.ValueString()
-
-	tflog.Debug(ctx, "Reading script config", map[string]interface{}{
-		"config_id": configID,
-	})
 
 	config, err := r.client.ScriptConfigs.GetByID(ctx, configID, "")
 	if err != nil {

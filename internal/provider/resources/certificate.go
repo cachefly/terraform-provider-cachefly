@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -165,13 +164,6 @@ func (r *CertificateResource) Create(ctx context.Context, req resource.CreateReq
 		createReq.Password = data.Password.ValueString()
 	}
 
-	tflog.Debug(ctx, "Creating certificate", map[string]interface{}{
-		"has_certificate": createReq.Certificate != "",
-		"has_key":         createReq.CertificateKey != "",
-		"has_password":    createReq.Password != "",
-	})
-
-	// Create certificate via API
 	cert, err := r.client.Certificates.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -181,15 +173,7 @@ func (r *CertificateResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Map response to state, preserving sensitive input data
 	r.mapCertificateToState(cert, &data)
-
-	tflog.Debug(ctx, "Certificate created successfully", map[string]interface{}{
-		"certificate_id":      cert.ID,
-		"subject_common_name": cert.SubjectCommonName,
-		"expires":             cert.NotAfter,
-	})
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -203,10 +187,6 @@ func (r *CertificateResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	certID := data.ID.ValueString()
-
-	tflog.Debug(ctx, "Reading certificate", map[string]interface{}{
-		"certificate_id": certID,
-	})
 
 	cert, err := r.client.Certificates.GetByID(ctx, certID, "")
 	if err != nil {
@@ -261,11 +241,6 @@ func (r *CertificateResource) Delete(ctx context.Context, req resource.DeleteReq
 
 	certID := data.ID.ValueString()
 
-	tflog.Debug(ctx, "Deleting certificate", map[string]interface{}{
-		"certificate_id": certID,
-	})
-
-	// Delete certificate via API
 	err := r.client.Certificates.Delete(ctx, certID)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -274,10 +249,6 @@ func (r *CertificateResource) Delete(ctx context.Context, req resource.DeleteReq
 		)
 		return
 	}
-
-	tflog.Debug(ctx, "Certificate deleted successfully", map[string]interface{}{
-		"certificate_id": certID,
-	})
 }
 
 // ImportState imports an existing resource into Terraform state

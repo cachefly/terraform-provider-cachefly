@@ -88,12 +88,6 @@ func (p *CacheFlyProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	// Log configuration
-	tflog.Debug(ctx, "Configuring CacheFly provider", map[string]interface{}{
-		"base_url": baseURL,
-		"version":  p.version,
-	})
-
 	// Create CacheFly SDK client using the proper constructor
 	cacheflyClient := cachefly.NewClient(
 		cachefly.WithToken(apiToken),
@@ -138,7 +132,6 @@ func (p *CacheFlyProvider) DataSources(ctx context.Context) []func() datasource.
 		datasources.NewServiceDomainsDataSource,
 		datasources.NewOriginDataSource,
 		datasources.NewOriginsDataSource,
-		datasources.NewServiceOptionsDataSource,
 		datasources.NewUsersDataSource,
 	}
 }

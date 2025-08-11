@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -161,11 +160,6 @@ func (d *OriginsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	tflog.Debug(ctx, "Reading origins data source", map[string]interface{}{
-		"type": data.Type.ValueString(),
-	})
-
-	// Build options
 	opts := api.ListOriginsOptions{
 		Type:         data.Type.ValueString(),
 		ResponseType: data.ResponseType.ValueString(),

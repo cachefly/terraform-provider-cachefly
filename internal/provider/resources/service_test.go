@@ -224,7 +224,6 @@ func testAccCheckServiceExists(resourceName string) resource.TestCheckFunc {
 			return fmt.Errorf("No Service ID is set")
 		}
 
-		fmt.Printf("rs.Primary.ID: %s\n", rs.Primary.ID)
 		sdkClient := provider.GetSDKClient()
 		if sdkClient == nil {
 			return fmt.Errorf("Failed to create CacheFly client")

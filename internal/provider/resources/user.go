@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -176,11 +175,6 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 		createReq.Permissions = permissions
 	}
 
-	tflog.Debug(ctx, "Creating user", map[string]interface{}{
-		"username": createReq.Username,
-		"email":    createReq.Email,
-	})
-
 	user, err := r.client.Users.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -192,11 +186,6 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	// Map response to state
 	r.mapUserToState(user, &data)
-
-	tflog.Debug(ctx, "User created successfully", map[string]interface{}{
-		"user_id":  user.ID,
-		"username": user.Username,
-	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -211,10 +200,6 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	userID := data.ID.ValueString()
-
-	tflog.Debug(ctx, "Reading user", map[string]interface{}{
-		"user_id": userID,
-	})
 
 	user, err := r.client.Users.GetByID(ctx, userID, "")
 	if err != nil {
@@ -310,10 +295,6 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	userID := data.ID.ValueString()
 
-	tflog.Debug(ctx, "Deleting user", map[string]interface{}{
-		"user_id": userID,
-	})
-
 	err := r.client.Users.DeleteByID(ctx, userID)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -322,10 +303,6 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		)
 		return
 	}
-
-	tflog.Debug(ctx, "User deleted successfully", map[string]interface{}{
-		"user_id": userID,
-	})
 }
 
 // ImportState imports an existing resource into Terraform state
