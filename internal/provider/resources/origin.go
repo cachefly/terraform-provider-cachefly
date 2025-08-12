@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -58,6 +60,9 @@ func (r *OriginResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Description: "Name of the origin.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"hostname": schema.StringAttribute{
 				Description: "Hostname of the origin server.",
@@ -67,36 +72,57 @@ func (r *OriginResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Description: "Protocol scheme (HTTP, HTTPS, or FOLLOW).",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"cache_by_query_param": schema.BoolAttribute{
 				Description: "Whether to cache content based on query parameters.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"gzip": schema.BoolAttribute{
 				Description: "Whether to enable gzip compression.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"ttl": schema.Int32Attribute{
 				Description: "Time to live (TTL) in seconds for cached content.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
 			"missed_ttl": schema.Int32Attribute{
 				Description: "TTL in seconds for missed (404/error) responses.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
 			"connection_timeout": schema.Int32Attribute{
 				Description: "Connection timeout in seconds.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
 			"time_to_first_byte_timeout": schema.Int32Attribute{
 				Description: "Time to first byte timeout in seconds.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
 
 			// S3-specific attributes

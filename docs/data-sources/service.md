@@ -28,5 +28,6 @@ Retrieves information about an existing CacheFly CDN service.
 - `configuration_mode` (String) The configuration mode of the service.
 - `created_at` (String) The timestamp when the service was created.
 - `name` (String) The display name of the service.
+- `options` (Dynamic) Service options configuration as key-value pairs returned by the API.
 - `status` (String) The current status of the service.
 - `updated_at` (String) The timestamp when the service was last updated.

@@ -26,6 +26,7 @@ A service represents a CDN configuration that defines how content is cached and 
 - `delivery_region` (String) The delivery region for the service.
 - `description` (String) A description of the service.
 - `options` (Dynamic) Service options configuration as key-value pairs. Each option follows the enabled/value structure for feature options.
+- `status` (String) The current status of the service. Set this to 'ACTIVE' to activate the service or 'DEACTIVATED' to deactivate it.
 - `tls_profile` (String) The TLS profile to use for SSL connections.
 
 ### Read-Only
@@ -33,5 +34,4 @@ A service represents a CDN configuration that defines how content is cached and 
 - `configuration_mode` (String) The configuration mode for the service.
 - `created_at` (String) The timestamp when the service was created.
 - `id` (String) The unique identifier of the service.
-- `status` (String) The current status of the service.
 - `updated_at` (String) The timestamp when the service was last updated.

@@ -132,7 +132,9 @@ func (p *CacheFlyProvider) DataSources(ctx context.Context) []func() datasource.
 		datasources.NewServiceDomainsDataSource,
 		datasources.NewOriginDataSource,
 		datasources.NewOriginsDataSource,
+		datasources.NewLogTargetsDataSource,
 		datasources.NewUsersDataSource,
+		datasources.NewDeliveryRegionsDataSource,
 	}
 }
 
