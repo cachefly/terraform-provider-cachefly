@@ -25,7 +25,7 @@ A service represents a CDN configuration that defines how content is cached and 
 - `auto_ssl` (Boolean) Whether to automatically provision SSL certificates.
 - `delivery_region` (String) The delivery region for the service.
 - `description` (String) A description of the service.
-- `options` (Dynamic) Service options configuration as key-value pairs. Each option follows the enabled/value structure for feature options.
+- `options` (Dynamic) Service options as a map. Full option catalog, types, allowed values, and constraints: [Service Options Reference](https://docs.cachefly.com/docs/service-options-reference)
 - `status` (String) The current status of the service. Set this to 'ACTIVE' to activate the service or 'DEACTIVATED' to deactivate it.
 - `tls_profile` (String) The TLS profile to use for SSL connections.
 

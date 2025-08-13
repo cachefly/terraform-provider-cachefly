@@ -89,8 +89,9 @@ func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:    true,
 			},
 			"options": schema.DynamicAttribute{
-				Description: "Service options configuration as key-value pairs. Each option follows the enabled/value structure for feature options.",
-				Optional:    true,
+				MarkdownDescription: `Service options as a map. Full option catalog, types, allowed values, and constraints: [Service Options Reference](https://docs.cachefly.com/docs/service-options-reference)`,
+				Description:         "Service options configuration as key-value pairs. Each option follows the enabled/value structure for feature options.",
+				Optional:            true,
 				// Computed:    true,
 			},
 			"status": schema.StringAttribute{
