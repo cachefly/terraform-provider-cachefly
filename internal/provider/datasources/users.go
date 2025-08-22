@@ -151,7 +151,6 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	// Build list options
 	opts := api.ListUsersOptions{}
 
 	if !data.Search.IsNull() && !data.Search.IsUnknown() {
@@ -160,23 +159,43 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	if !data.Offset.IsNull() && !data.Offset.IsUnknown() {
 		opts.Offset = int(data.Offset.ValueInt64())
 	}
-	if !data.Limit.IsNull() && !data.Limit.IsUnknown() {
-		opts.Limit = int(data.Limit.ValueInt64())
-	}
 	if !data.ResponseType.IsNull() && !data.ResponseType.IsUnknown() {
 		opts.ResponseType = data.ResponseType.ValueString()
 	}
-	// Fetch users from API
-	usersResp, err := d.client.Users.List(ctx, opts)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Users",
-			"Could not read users list: "+err.Error(),
-		)
-		return
+
+	if !data.Limit.IsNull() && !data.Limit.IsUnknown() {
+		opts.Limit = int(data.Limit.ValueInt64())
+	} else {
+		opts.Limit = 100
 	}
 
-	// Map response to state
+	var allUsers []api.User
+	totalCount := 0
+	for {
+		pageResp, err := d.client.Users.List(ctx, opts)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Users",
+				"Could not read users list: "+err.Error(),
+			)
+			return
+		}
+
+		if totalCount == 0 {
+			totalCount = pageResp.Meta.Count
+		}
+
+		allUsers = append(allUsers, pageResp.Users...)
+
+		fetched := len(pageResp.Users)
+		opts.Offset += fetched
+
+		if fetched < opts.Limit || pageResp.Meta.Count > 0 && opts.Offset == pageResp.Meta.Count {
+			break
+		}
+	}
+
+	usersResp := &api.ListUsersResponse{Meta: api.MetaInfo{Count: totalCount}, Users: allUsers}
 	d.mapUsersToState(usersResp, &data)
 
 	// Set computed ID

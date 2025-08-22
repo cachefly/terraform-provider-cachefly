@@ -59,8 +59,8 @@ type OriginDataSourceModel struct {
 // represents the data source for listing multiple origins
 type OriginsDataSourceModel struct {
 	Type         types.String `tfsdk:"type"`
-	Offset       types.Int64  `tfsdk:"offset"`
-	Limit        types.Int64  `tfsdk:"limit"`
+	Offset       types.Int32  `tfsdk:"offset"`
+	Limit        types.Int32  `tfsdk:"limit"`
 	ResponseType types.String `tfsdk:"response_type"`
 
 	// Results

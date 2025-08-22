@@ -142,21 +142,33 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 	if !data.Limit.IsNull() {
 		opts.Limit = int(data.Limit.ValueInt64())
 	}
-
-	// Get the domains
-	domainsResp, err := d.client.ServiceDomains.List(ctx, data.ServiceID.ValueString(), opts)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Service Domains",
-			"Could not read service domains for service "+data.ServiceID.ValueString()+": "+err.Error(),
-		)
-		return
+	if opts.Limit <= 0 {
+		opts.Limit = 100
 	}
 
-	// Map response to data model
-	domains := make([]attr.Value, len(domainsResp.Domains))
-	for i, domain := range domainsResp.Domains {
-		// Convert certificates to list
+	var allDomains []api.ServiceDomain
+	for {
+		pageResp, err := d.client.ServiceDomains.List(ctx, data.ServiceID.ValueString(), opts)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Service Domains",
+				"Could not read service domains for service "+data.ServiceID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		allDomains = append(allDomains, pageResp.Domains...)
+
+		fetched := len(pageResp.Domains)
+		total := pageResp.Meta.Count
+		opts.Offset += fetched
+		if fetched < opts.Limit || (total > 0 && opts.Offset == total) {
+			break
+		}
+	}
+
+	domains := make([]attr.Value, len(allDomains))
+	for i, domain := range allDomains {
 		var certsList types.Set
 		if len(domain.Certificates) > 0 {
 			certElements := make([]attr.Value, len(domain.Certificates))
@@ -195,7 +207,7 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 		domains[i] = domainObj
 	}
 
-	domainsSet, diags := types.SetValue(
+	domainsList, diags := types.ListValue(
 		types.ObjectType{
 			AttrTypes: map[string]attr.Type{
 				"id":                types.StringType,
@@ -216,7 +228,7 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	data.Domains = domainsSet
+	data.Domains = domainsList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

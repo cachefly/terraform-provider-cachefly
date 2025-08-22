@@ -64,19 +64,19 @@ func (d *OriginDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 				Description: "Whether gzip compression is enabled.",
 				Computed:    true,
 			},
-			"ttl": schema.Int64Attribute{
+			"ttl": schema.Int32Attribute{
 				Description: "Time to live (TTL) in seconds for cached content.",
 				Computed:    true,
 			},
-			"missed_ttl": schema.Int64Attribute{
+			"missed_ttl": schema.Int32Attribute{
 				Description: "TTL in seconds for missed (404/error) responses.",
 				Computed:    true,
 			},
-			"connection_timeout": schema.Int64Attribute{
+			"connection_timeout": schema.Int32Attribute{
 				Description: "Connection timeout in seconds.",
 				Computed:    true,
 			},
-			"time_to_first_byte_timeout": schema.Int64Attribute{
+			"time_to_first_byte_timeout": schema.Int32Attribute{
 				Description: "Time to first byte timeout in seconds.",
 				Computed:    true,
 			},
@@ -169,7 +169,6 @@ func (d *OriginDataSource) mapOriginToDataSource(origin *api.Origin, data *model
 	data.ID = types.StringValue(origin.ID)
 	data.Type = types.StringValue(origin.Type)
 	data.Name = types.StringPointerValue(origin.Name)
-	data.Hostname = types.StringPointerValue(origin.Hostname)
 	data.Scheme = types.StringPointerValue(origin.Scheme)
 	data.CacheByQueryParam = types.BoolPointerValue(origin.CacheByQueryParam)
 	data.Gzip = types.BoolPointerValue(origin.Gzip)
@@ -177,6 +176,12 @@ func (d *OriginDataSource) mapOriginToDataSource(origin *api.Origin, data *model
 	data.MissedTTL = types.Int32PointerValue(origin.MissedTTL)
 	data.CreatedAt = types.StringValue(origin.CreatedAt)
 	data.UpdatedAt = types.StringValue(origin.UpdatedAt)
+
+	if origin.Type == "WEB" {
+		data.Hostname = types.StringPointerValue(origin.Hostname)
+	} else {
+		data.Hostname = types.StringPointerValue(origin.Host)
+	}
 
 	data.ConnectionTimeout = types.Int32PointerValue(origin.ConnectionTimeout)
 	data.TimeToFirstByteTimeout = types.Int32PointerValue(origin.TimeToFirstByteTimeout)

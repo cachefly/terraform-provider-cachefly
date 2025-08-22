@@ -179,24 +179,39 @@ func (d *ServiceDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 		// List all services and find the one with matching unique name
 		listOptions := api.ListOptions{
-			Limit: 100, // Get a large batch to avoid pagination issues
+			Limit:  100, // Fetch in pages
+			Offset: 0,
 		}
 
-		listResp, err := d.client.Services.List(ctx, listOptions)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Listing CacheFly Services",
-				"Could not list services to find by unique name: "+err.Error(),
-			)
-			return
-		}
-
-		// Find service with matching unique name
 		found := false
-		for _, svc := range listResp.Services {
-			if svc.UniqueName == uniqueName {
-				service = &svc
-				found = true
+		for {
+			listResp, err := d.client.Services.List(ctx, listOptions)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error Listing CacheFly Services",
+					"Could not list services to find by unique name: "+err.Error(),
+				)
+				return
+			}
+
+			// Find service with matching unique name in this page
+			for i := range listResp.Services {
+				if listResp.Services[i].UniqueName == uniqueName {
+					service = &listResp.Services[i]
+					found = true
+					break
+				}
+			}
+
+			if found {
+				break
+			}
+
+			fetched := len(listResp.Services)
+
+			listOptions.Offset += fetched
+
+			if fetched < listOptions.Limit || listResp.Meta.Count > 0 && listOptions.Offset == listResp.Meta.Count {
 				break
 			}
 		}

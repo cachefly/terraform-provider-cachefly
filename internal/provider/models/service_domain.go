@@ -43,5 +43,5 @@ type ServiceDomainsDataSourceModel struct {
 	ResponseType types.String `tfsdk:"response_type"`
 
 	// Results
-	Domains types.Set `tfsdk:"domains"`
+	Domains types.List `tfsdk:"domains"`
 }

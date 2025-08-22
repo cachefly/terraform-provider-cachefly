@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -41,11 +42,11 @@ func (d *OriginsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				Description: "Filter origins by type (e.g., 'http', 's3', 'gcs').",
 				Optional:    true,
 			},
-			"offset": schema.Int64Attribute{
+			"offset": schema.Int32Attribute{
 				Description: "Offset for pagination (default: 0).",
 				Optional:    true,
 			},
-			"limit": schema.Int64Attribute{
+			"limit": schema.Int32Attribute{
 				Description: "Limit for pagination (default: API default).",
 				Optional:    true,
 			},
@@ -70,7 +71,7 @@ func (d *OriginsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 							Description: "Name of the origin.",
 							Computed:    true,
 						},
-						"host": schema.StringAttribute{
+						"hostname": schema.StringAttribute{
 							Description: "Hostname of the origin server.",
 							Computed:    true,
 						},
@@ -86,19 +87,19 @@ func (d *OriginsDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 							Description: "Whether gzip compression is enabled.",
 							Computed:    true,
 						},
-						"ttl": schema.Int64Attribute{
+						"ttl": schema.Int32Attribute{
 							Description: "Time to live (TTL) in seconds for cached content.",
 							Computed:    true,
 						},
-						"missed_ttl": schema.Int64Attribute{
+						"missed_ttl": schema.Int32Attribute{
 							Description: "TTL in seconds for missed (404/error) responses.",
 							Computed:    true,
 						},
-						"connection_timeout": schema.Int64Attribute{
+						"connection_timeout": schema.Int32Attribute{
 							Description: "Connection timeout in seconds.",
 							Computed:    true,
 						},
-						"time_to_first_byte_timeout": schema.Int64Attribute{
+						"time_to_first_byte_timeout": schema.Int32Attribute{
 							Description: "Time to first byte timeout in seconds.",
 							Computed:    true,
 						},
@@ -166,38 +167,51 @@ func (d *OriginsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	if !data.Offset.IsNull() {
-		opts.Offset = int(data.Offset.ValueInt64())
+		opts.Offset = int(data.Offset.ValueInt32())
 	}
 	if !data.Limit.IsNull() {
-		opts.Limit = int(data.Limit.ValueInt64())
+		opts.Limit = int(data.Limit.ValueInt32())
+	}
+	if opts.Limit <= 0 {
+		opts.Limit = 100
 	}
 
-	// Get the origins
-	originsResp, err := d.client.Origins.List(ctx, opts)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Origins",
-			"Could not read origins: "+err.Error(),
-		)
-		return
+	var allOrigins []api.Origin
+	for {
+		pageResp, err := d.client.Origins.List(ctx, opts)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Origins",
+				"Could not read origins: "+err.Error(),
+			)
+			return
+		}
+
+		allOrigins = append(allOrigins, pageResp.Origins...)
+
+		fetched := len(pageResp.Origins)
+		total := pageResp.Meta.Count
+		opts.Offset += fetched
+		if fetched < opts.Limit || (total > 0 && opts.Offset == total) {
+			break
+		}
 	}
 
-	// Map response to data model
-	origins := make([]attr.Value, len(originsResp.Origins))
-	for i, origin := range originsResp.Origins {
+	origins := make([]attr.Value, len(allOrigins))
+	for i, origin := range allOrigins {
 		originObj, _ := types.ObjectValue(
 			map[string]attr.Type{
 				"id":                         types.StringType,
 				"type":                       types.StringType,
 				"name":                       types.StringType,
-				"host":                       types.StringType,
+				"hostname":                   types.StringType,
 				"scheme":                     types.StringType,
 				"cache_by_query_param":       types.BoolType,
 				"gzip":                       types.BoolType,
-				"ttl":                        types.Int64Type,
-				"missed_ttl":                 types.Int64Type,
-				"connection_timeout":         types.Int64Type,
-				"time_to_first_byte_timeout": types.Int64Type,
+				"ttl":                        types.Int32Type,
+				"missed_ttl":                 types.Int32Type,
+				"connection_timeout":         types.Int32Type,
+				"time_to_first_byte_timeout": types.Int32Type,
 				"access_key":                 types.StringType,
 				"secret_key":                 types.StringType,
 				"region":                     types.StringType,
@@ -206,10 +220,15 @@ func (d *OriginsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 				"updated_at":                 types.StringType,
 			},
 			map[string]attr.Value{
-				"id":                         types.StringValue(origin.ID),
-				"type":                       types.StringValue(origin.Type),
-				"name":                       types.StringPointerValue(origin.Name),
-				"host":                       types.StringPointerValue(origin.Hostname),
+				"id":   types.StringValue(origin.ID),
+				"type": types.StringValue(origin.Type),
+				"name": types.StringPointerValue(origin.Name),
+				"hostname": func() basetypes.StringValue {
+					if origin.Type == "WEB" {
+						return types.StringPointerValue(origin.Hostname)
+					}
+					return types.StringPointerValue(origin.Host)
+				}(),
 				"scheme":                     types.StringPointerValue(origin.Scheme),
 				"cache_by_query_param":       types.BoolPointerValue(origin.CacheByQueryParam),
 				"gzip":                       types.BoolPointerValue(origin.Gzip),
@@ -234,7 +253,7 @@ func (d *OriginsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 				"id":                         types.StringType,
 				"type":                       types.StringType,
 				"name":                       types.StringType,
-				"host":                       types.StringType,
+				"hostname":                   types.StringType,
 				"scheme":                     types.StringType,
 				"cache_by_query_param":       types.BoolType,
 				"gzip":                       types.BoolType,

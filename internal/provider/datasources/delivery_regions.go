@@ -112,15 +112,32 @@ func (d *DeliveryRegionsDataSource) Read(ctx context.Context, req datasource.Rea
 	if !data.Limit.IsNull() {
 		opts.Limit = int(data.Limit.ValueInt64())
 	}
+	// Set a sane default page size if not provided
+	if opts.Limit <= 0 {
+		opts.Limit = 100
+	}
 
-	// Fetch delivery regions from API
-	listResp, err := d.client.DeliveryRegions.List(ctx, opts)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Delivery Regions",
-			"Could not read delivery regions: "+err.Error(),
-		)
-		return
+	// Fetch and accumulate all pages
+	var allRegions []api.DeliveryRegion
+	for {
+		pageResp, err := d.client.DeliveryRegions.List(ctx, opts)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Delivery Regions",
+				"Could not read delivery regions: "+err.Error(),
+			)
+			return
+		}
+
+		allRegions = append(allRegions, pageResp.Regions...)
+
+		fetched := len(pageResp.Regions)
+		total := pageResp.Meta.Count
+		opts.Offset += fetched
+
+		if fetched == 0 || (total > 0 && opts.Offset >= total) {
+			break
+		}
 	}
 
 	// Prepare attribute type map for each object in the list
@@ -131,8 +148,8 @@ func (d *DeliveryRegionsDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 
 	// Map response to Terraform values
-	items := make([]attr.Value, len(listResp.Regions))
-	for i, region := range listResp.Regions {
+	items := make([]attr.Value, len(allRegions))
+	for i, region := range allRegions {
 		obj, _ := types.ObjectValue(
 			objectAttrTypes,
 			map[string]attr.Value{

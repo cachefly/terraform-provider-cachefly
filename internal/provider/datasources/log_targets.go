@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
 	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
@@ -207,9 +206,6 @@ func (d *LogTargetsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	var allLogTargets []api.LogTarget
 	for {
 		pageResp, err := d.client.LogTargets.List(ctx, opts)
-		tflog.Info(ctx, "Log targets", map[string]interface{}{
-			"log_targets": pageResp.LogTargets,
-		})
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading CacheFly Log Targets",
