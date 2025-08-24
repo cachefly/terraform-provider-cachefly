@@ -9,12 +9,12 @@ require (
 )
 
 require (
-	github.com/cachefly/cachefly-go-sdk v1.0.4
+	github.com/cachefly/cachefly-sdk-go v1.0.4
 	github.com/hashicorp/terraform-plugin-go v0.23.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
 
-//replace github.com/cachefly/cachefly-sdk-go => ../cachefly-go-sdk
+replace github.com/cachefly/cachefly-sdk-go => ../cachefly-sdk-go
 
 require (
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect

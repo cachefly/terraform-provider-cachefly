@@ -2,15 +2,13 @@
  <img src="https://www.cachefly.com/wp-content/uploads/2023/10/Thumbnail-About-Us-Video.png" alt="CacheFly Logo" width="200"/>
 </p>
 
-<h4 align="center">Terraform Provider for CacheFly API (2.5.0)</h4>
+<h4 align="center">Terraform Provider for CacheFly API (2.6.0)</h4>
 
 <hr style="width: 50%; border: 1px solid #000; margin: 20px auto;">
 
 # Terraform Provider for CacheFly
 
-A Golang Terraform provider built using CacheFly Go SDK [GoLang SDK for CacheFly v1.0](https://github.com/cachefly/cachfly-go-sdk). Supports CacheFly API (2.5.0)
-
-> CacheFly API v2.6 support coming soon.
+A Golang Terraform provider built using CacheFly Go SDK [GoLang SDK for CacheFly v1.0](https://github.com/cachefly/cachefly-sdk-go). Supports CacheFly API (2.6.0)
 
 ## About CacheFly
 
@@ -24,99 +22,114 @@ Add the provider to your Terraform configuration:
 terraform {
   required_providers {
     cachefly = {
-      source  = "cachefly/cachefly" 
-      version = "0.1.0"
+      source  = "cachefly/cachefly"
+      # Pin to a version or range as needed, e.g.:
+      # version = ">= 0.1.0"
     }
   }
 }
 
 provider "cachefly" {
-  api_token = "your-cachefly-api-token" # Replace with a valid CacheFly API token
+  # Prefer environment variable: CACHEFLY_API_TOKEN
+  # api_token = "your-cachefly-api-token"
+
+  # Optional: override API base URL (defaults to https://api.cachefly.com/api/2.6)
+  # base_url = "https://api.cachefly.com/api/2.6"
 }
 ```
 
 ## Quick Start
 
-Here's a basic example to get you started:
+Basic examples to get started:
 
 ```hcl
-# List existing services
-data "cachefly_services" "list_services" {
-  response_type     = "shallow"
-  include_features  = false
-  status           = "ACTIVE"
-  offset           = 0
-  limit            = 10
+# Create a CacheFly service
+resource "cachefly_service" "example" {
+  name        = "Example Service"
+  unique_name = "example-service-123"
+  auto_ssl    = true
+
+  # Configure service options as a map (see docs for full catalog)
+  # options = {
+  #   cors = { enabled = true }
+  # }
 }
 
-output "services" {
-  value = data.cachefly_services.list_services.services
+output "service_id" {
+  value = cachefly_service.example.id
+}
+```
+
+Or look up an existing service by unique name:
+
+```hcl
+data "cachefly_service" "by_unique_name" {
+  unique_name      = "example-service-123"
+  response_type    = "shallow"
+  include_features = false
+}
+
+output "service_status" {
+  value = data.cachefly_service.by_unique_name.status
 }
 ```
 
 ## Examples
 
-Explore comprehensive examples to help you get started:
+Explore examples in this repository:
 
-- **[Quick Start Guide](./examples/quickstart-setup/main.tf)** - Simple examples to get up and running quickly
-- **[Origins Configuration](./examples/origins-setup/main.tf)** - Setting up origin servers and configurations  
-- **[CDN Service + Domain Configuration](./examples/service-domain-setup/main.tf)** - Setting up CDN Service and Domains
-
-- **[SSL Certificate Configuration](./examples/certificate-setup/main.tf)** - Example shows how to configure SSL certificate
-- **[Script Configuration](./examples/script-config-setup/main.tf)** - CDN Service advanced script congigrations
-
-- **[Users Setup](./examples/users-setup/main.tf)** - Setting user accounts 
-- **[Service Options](./examples/service-options-advanced-setup/main.tf)** - Advanced service configuration options
-- **[Service, Domain and Options](./examples/service-domain-options-setup/main.tf)** - Full configuration service, domain and options
-
-- **[Comprehensive Setup](./examples/comprehensive-setup/main.tf)** - Full configuration with service creation and management
+- **Provider and basics**: [`examples/README.md`](./examples/README.md)
+- **Service resource**: [`examples/resources/cachefly_service/resource.tf`](./examples/resources/cachefly_service/resource.tf)
+- **Service domain resource**: [`examples/resources/cachefly_service_domain/resource.tf`](./examples/resources/cachefly_service_domain/resource.tf)
+- **Origin resource**: [`examples/resources/cachefly_origin/resource.tf`](./examples/resources/cachefly_origin/resource.tf)
+- **Certificate resource**: [`examples/resources/cachefly_certificate/resource.tf`](./examples/resources/cachefly_certificate/resource.tf)
+- **Script config resource**: [`examples/resources/cachefly_script_config/resource.tf`](./examples/resources/cachefly_script_config/resource.tf)
+- **User resource**: [`examples/resources/cachefly_user/resource.tf`](./examples/resources/cachefly_user/resource.tf)
+- **Log target resource**: [`examples/resources/cachefly_log_target/resource.tf`](./examples/resources/cachefly_log_target/resource.tf)
 
 
 ## Features
-- **Service Management** - Create, update, and manage CacheFly services with auto-SSL
-- **Origin Configuration** - Configure origin servers with timeouts, compression, and caching settings
-- **Custom Domain Management** - Attach custom domains with DNS validation
-- **SSL Certificate Management** - Custom SSL certificates and auto-SSL configuration
-- **Comprehensive Service Options** - 30+ CDN configuration options including:
- * Caching Control (nocache, servestale, normalizequerystring, purgenoquery)
- * Performance Optimization (brotli_support, bandwidth throttling, connection limits)
- * Geographic Caching (by country, region, referer)
- * Timeout Configurations (TTFB, connection, error TTL, max connections)
- * Security Features (API keys, serve key protection)
- * Advanced Features (live streaming, link preheating, CORS, redirects)
- * File Handling (skip encoding/processing by extension, directory purge control)
-- **Script Configurations** - Automation and custom logic (URL redirects, AWS credentials)
-- **User Management** - Team access control with granular permissions and service assignments
-- **Full API Coverage** - Comprehensive support for CacheFly API v2.5.0
+- **Service management**: Create/update CacheFly services with auto-SSL and rich options
+- **Origin configuration**: HTTP/S3 origins, timeouts, compression, TTLs
+- **Custom domains**: Attach/manage domains with validation and certificates
+- **SSL certificates**: Upload and manage custom TLS/SSL certs
+- **Script configs**: Manage reusable script configurations and activation
+- **Users**: Create/manage users, permissions, and service assignments
+- **Log targets**: Configure S3/Elasticsearch/Google Bucket logging targets
+- **Data sources**: Query services, domains, origins, users, log targets, delivery regions
 
 ## Resources and Data Sources
 
 ### Resources
-- `cachefly_service` - Manage CacheFly CDN services with auto-SSL and configuration modes
-- `cachefly_origin` - Configure origin servers with timeouts, compression, and caching settings
-- `cachefly_service_domain` - Attach and manage custom domains with DNS validation
-- `cachefly_certificate` - Upload and manage custom SSL certificates
-- `cachefly_service_options` - Configure comprehensive CDN options (30+ settings)
-- `cachefly_script_config` - Manage automation scripts and custom logic configurations
-- `cachefly_user` - Create and manage team users with granular permissions
+- `cachefly_service`
+- `cachefly_service_domain`
+- `cachefly_origin`
+- `cachefly_user`
+- `cachefly_script_config`
+- `cachefly_certificate`
+- `cachefly_log_target`
 
 ### Data Sources
-- `cachefly_services` - List and query existing services
-- `cachefly_service` - Get details of a specific service
-- `cachefly_origins` - List and query origin servers by type
-- `cachefly_service_domains` - List domains attached to a specific service
+- `cachefly_service`
+- `cachefly_service_domain`
+- `cachefly_service_domains`
+- `cachefly_origin`
+- `cachefly_origins`
+- `cachefly_log_targets`
+- `cachefly_users`
+- `cachefly_delivery_regions`
 
 ##  Tests
-   we have unit tests for provider at `./internal/provider/`
+We have unit tests for the provider at `./internal/provider/`.
 
-```run  tests 
-  go test -v -count=1 ./internal/provider/
+```bash
+go test -v -count=1 ./internal/provider/
 ```
 
 
 ## Documentation
 
-For detailed documentation on all resources and data sources, visit the [Terraform Registry documentation](https://registry.terraform.io/providers/cachefly.com/cachefly/cachefly/latest/docs).
+For detailed documentation on all resources and data sources, visit the [Terraform Registry documentation](https://registry.terraform.io/providers/cachefly/cachefly/latest).
 
 ## Output Example
 
@@ -127,8 +140,8 @@ The following screenshot shows Terraform in action, deploying a new service and 
 ## Requirements
 
 - Terraform >= 0.13
-- Go >= 1.19 (for development)
-- Valid CacheFly API token
+- Go >= 1.23 (for development)
+- Valid CacheFly API token (set `CACHEFLY_API_TOKEN` or `api_token`)
 
 ## Contributing
 

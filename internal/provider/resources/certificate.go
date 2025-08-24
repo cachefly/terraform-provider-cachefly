@@ -13,8 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )

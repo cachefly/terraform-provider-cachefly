@@ -16,13 +16,13 @@ page_title: "Comprehensive Setup Guide"
 
 ```bash
 export CACHEFLY_API_TOKEN="your-api-token"
-# Optional override (defaults to https://api.cachefly.com/api/2.5)
-export CACHEFLY_BASE_URL="https://api.cachefly.com/api/2.5"
+# Optional override (defaults to https://api.cachefly.com/api/2.6)
+export CACHEFLY_BASE_URL="https://api.cachefly.com/api/2.6"
 ```
 
 ```powershell
 $env:CACHEFLY_API_TOKEN = "your-api-token"
-$env:CACHEFLY_BASE_URL  = "https://api.cachefly.com/api/2.5"
+$env:CACHEFLY_BASE_URL  = "https://api.cachefly.com/api/2.6"
 ```
 
 Alternatively, set `api_token` in the `provider "cachefly" {}` block.
@@ -590,4 +590,3 @@ output "setup_status" {
     users_created    = "✅ 2 users created"
   }
 }
-```

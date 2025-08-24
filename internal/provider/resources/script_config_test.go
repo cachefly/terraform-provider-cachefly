@@ -11,7 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
+
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider"
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/resources"
 )
@@ -104,7 +105,7 @@ func TestAccScriptConfigResource(t *testing.T) {
 	sdkClient := provider.GetSDKClient()
 
 	// Fetch available script config definitions and take the first one
-	defs, err := sdkClient.ScriptDefinitions.List(context.Background(), v2_5.ListScriptDefinitionsOptions{})
+	defs, err := sdkClient.ScriptDefinitions.List(context.Background(), v2_6.ListScriptDefinitionsOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get script config definitions: %v", err)
 	}

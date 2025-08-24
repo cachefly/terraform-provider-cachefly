@@ -3,7 +3,7 @@ package models
 import (
 	"context"
 
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )

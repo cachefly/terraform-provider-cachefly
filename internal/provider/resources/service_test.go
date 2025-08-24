@@ -10,7 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
+
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider"
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/resources"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -86,13 +87,13 @@ func TestServiceResourceConfigure(t *testing.T) {
 func TestAccServiceResource(t *testing.T) {
 	sdkClient := provider.GetSDKClient()
 	rName := "test-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
-	tlsProfiles, err := sdkClient.TLSProfiles.List(context.Background(), v2_5.ListTLSProfilesOptions{})
+	tlsProfiles, err := sdkClient.TLSProfiles.List(context.Background(), v2_6.ListTLSProfilesOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get TLS profiles: %v", err)
 	}
 	tlsProfileId := tlsProfiles.Profiles[0].ID
 
-	deliveryRegions, err := sdkClient.DeliveryRegions.List(context.Background(), v2_5.ListDeliveryRegionsOptions{})
+	deliveryRegions, err := sdkClient.DeliveryRegions.List(context.Background(), v2_6.ListDeliveryRegionsOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get services: %v", err)
 	}

@@ -17,4 +17,4 @@ The CacheFly provider allows you to manage CacheFly CDN resources using Terrafor
 ### Optional
 
 - `api_token` (String, Sensitive) The API token for authenticating with CacheFly. Can also be set with the `CACHEFLY_API_TOKEN` environment variable.
-- `base_url` (String) The base URL for the CacheFly API. Defaults to `https://api.cachefly.com/api/2.5`. Can also be set with the `CACHEFLY_BASE_URL` environment variable.
+- `base_url` (String) The base URL for the CacheFly API. Defaults to `https://api.cachefly.com/api/2.6`. Can also be set with the `CACHEFLY_BASE_URL` environment variable.

@@ -26,7 +26,7 @@ func TestProvider(t *testing.T) {
 const testAccProviderConfig = `
 provider "cachefly" {
   api_token = "test-token"
-  base_url  = "https://api.test.cachefly.com/api/2.5"
+  base_url  = "https://api.test.cachefly.com/api/2.6"
 }
 `
 
@@ -71,7 +71,7 @@ func TestProviderConfigure(t *testing.T) {
 			config: `
 				provider "cachefly" {
 					api_token = "test-token"
-					base_url  = "https://api.test.cachefly.com/api/2.5"
+					base_url  = "https://api.test.cachefly.com/api/2.6"
 				}
 			`,
 			expectError: false,
@@ -83,7 +83,7 @@ func TestProviderConfigure(t *testing.T) {
 			`,
 			envVars: map[string]string{
 				"CACHEFLY_API_TOKEN": "env-token",
-				"CACHEFLY_BASE_URL":  "https://api.env.cachefly.com/api/2.5",
+				"CACHEFLY_BASE_URL":  "https://api.env.cachefly.com/api/2.6",
 			},
 			expectError: false,
 		},

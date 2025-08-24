@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
 )
 
 var TestAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
@@ -67,7 +67,7 @@ func GetSDKClient() *cachefly.Client {
 
 		baseURL := os.Getenv("CACHEFLY_BASE_URL")
 		if baseURL == "" {
-			baseURL = "https://api.cachefly.com/api/2.5"
+			baseURL = "https://api.cachefly.com/api/2.6"
 		}
 
 		sdkClient = cachefly.NewClient(
