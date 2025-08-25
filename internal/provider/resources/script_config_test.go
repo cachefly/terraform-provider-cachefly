@@ -112,7 +112,21 @@ func TestAccScriptConfigResource(t *testing.T) {
 	if len(defs.Definitions) == 0 {
 		t.Fatalf("No script config definitions available for the account")
 	}
-	definitionID := defs.Definitions[0].ID
+	var definitionID string
+	for _, def := range defs.Definitions {
+		for _, mimeType := range def.AllowedMimeTypes {
+			if mimeType == "text/json" || mimeType == "application/json" {
+				definitionID = def.ID
+				break
+			}
+		}
+		if definitionID != "" {
+			break
+		}
+	}
+	if definitionID == "" {
+		t.Fatalf("No script config definition with JSON mime type found")
+	}
 
 	rName := "test-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	resourceName := "cachefly_script_config." + rName
@@ -129,10 +143,9 @@ func TestAccScriptConfigResource(t *testing.T) {
 					testAccCheckScriptConfigExists(resourceName),
 					resource.TestCheckResourceAttr(resourceName, "name", rName),
 					resource.TestCheckResourceAttr(resourceName, "script_config_definition", definitionID),
-					resource.TestCheckResourceAttr(resourceName, "value", "test"),
+					resource.TestCheckResourceAttr(resourceName, "value", "{\"something\":2324}"),
 					resource.TestCheckResourceAttrSet(resourceName, "id"),
 					resource.TestCheckResourceAttrSet(resourceName, "created_at"),
-					resource.TestCheckResourceAttrSet(resourceName, "updated_at"),
 				),
 			},
 			// ImportState testing
@@ -140,7 +153,7 @@ func TestAccScriptConfigResource(t *testing.T) {
 				ResourceName:            resourceName,
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"updated_at", "value"},
+				ImportStateVerifyIgnore: []string{"updated_at"},
 			},
 		},
 	})
@@ -207,11 +220,7 @@ provider "cachefly" {}
 resource "cachefly_script_config" %q {
   name                     = %q
   script_config_definition = %q
-  value                    = <<-JSON5
-  {
-    something: 2324,
-  }
-  JSON5
+  value                    = "{\"something\":2324}"
 }
 `, name, name, definitionID)
 }

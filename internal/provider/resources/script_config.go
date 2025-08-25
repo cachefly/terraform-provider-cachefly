@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -84,7 +83,6 @@ func (r *ScriptConfigResource) Schema(ctx context.Context, req resource.SchemaRe
 				Description: "Whether the script config should be activated. Defaults to true.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(true),
 			},
 			"purpose": schema.StringAttribute{
 				Description: "Purpose of the script config definition.",
@@ -238,15 +236,7 @@ func (r *ScriptConfigResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	if !data.Value.Equal(state.Value) {
-		valueStr := data.Value.ValueString()
-		if valueStr != "" {
-			var value interface{}
-			if err := json.Unmarshal([]byte(valueStr), &value); err != nil {
-				// If JSON parsing fails, use as string
-				value = valueStr
-			}
-			updateReq.Value = value
-		}
+		updateReq.Value = data.Value.ValueString()
 	}
 
 	config, err := r.client.ScriptConfigs.UpdateByID(ctx, configID, *updateReq)
@@ -323,14 +313,19 @@ func (r *ScriptConfigResource) mapScriptConfigToState(config *api.ScriptConfig, 
 	data.UseSchema = types.BoolValue(config.UseSchema)
 	data.DataModel = types.StringValue(config.DataModel)
 
-	// Convert Services slice to set
+	if config.Status == "ACTIVATED" {
+		data.Activated = types.BoolValue(true)
+	} else {
+		data.Activated = types.BoolValue(false)
+	}
+
 	if len(config.Services) > 0 {
 		serviceValues := make([]attr.Value, len(config.Services))
 		for i, service := range config.Services {
 			serviceValues[i] = types.StringValue(service)
 		}
 		data.Services = types.SetValueMust(types.StringType, serviceValues)
-	} else {
+	} else if !data.Services.IsNull() {
 		data.Services = types.SetValueMust(types.StringType, []attr.Value{})
 	}
 

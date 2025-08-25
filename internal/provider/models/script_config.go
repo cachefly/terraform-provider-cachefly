@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 
 	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -44,21 +43,11 @@ func (m *ScriptConfigModel) ToSDKCreateRequest(ctx context.Context) *api.CreateS
 		}
 	}
 
-	// Convert Value JSON string to interface{}
-	var value interface{}
-	if !m.Value.IsUnknown() {
-		valueStr := m.Value.ValueString()
-		if err := json.Unmarshal([]byte(valueStr), &value); err != nil {
-			// If JSON parsing fails, use as string
-			value = valueStr
-		}
-	}
-
 	return &api.CreateScriptConfigRequest{
 		Name:                   m.Name.ValueString(),
 		Services:               services,
 		ScriptConfigDefinition: m.ScriptConfigDefinition.ValueString(),
 		MimeType:               m.MimeType.ValueString(),
-		Value:                  value,
+		Value:                  m.Value.ValueString(),
 	}
 }
