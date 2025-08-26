@@ -36,7 +36,7 @@ Read-Only:
 - `connection_timeout` (Number) Connection timeout in seconds.
 - `created_at` (String) When the origin was created.
 - `gzip` (Boolean) Whether gzip compression is enabled.
-- `host` (String) Hostname of the origin server.
+- `hostname` (String) Hostname of the origin server.
 - `id` (String) The unique identifier of the origin.
 - `missed_ttl` (Number) TTL in seconds for missed (404/error) responses.
 - `name` (String) Name of the origin.

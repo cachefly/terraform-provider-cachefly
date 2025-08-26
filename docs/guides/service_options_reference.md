@@ -7,58 +7,9 @@ page_title: "Service options reference"
 
 This page lists the supported `options` for the `cachefly_service` resource and how to configure them in Terraform.
 
-Two kinds of options exist:
-
-- Standard options: simple booleans toggles.
-- Dynamic options: structured objects that usually follow the pattern `{ enabled = <bool>, value = <typed value> }`. Some dynamic options define their own object schema instead of `value`.
-
 See also: `../resources/service.md` → attribute `options`.
 
-## Standard options
-
-- protectServeKeyEnabled (Boolean)
-  - Enables ProtectServe. When set to true, the provider regenerates the ProtectServe key; when set to false, the key is deleted.
-  - Example:
-
-```hcl
-options = {
-  protectServeKeyEnabled = true
-}
-```
-
-- cors (Boolean)
-  - Enables CORS override for the service.
-  - Example:
-
-```hcl
-options = {
-  cors = true
-}
-```
-
-- referrerBlocking (Boolean)
-  - Blocks requests based on referrer rules.
-  - Example:
-
-```hcl
-options = {
-  referrerBlocking = true
-}
-```
-
-- autoRedirect (Boolean)
-  - Automatically redirects HTTP to HTTPS.
-  - Example:
-
-```hcl
-options = {
-  autoRedirect = true
-}
-```
-
-## Dynamic options
-
-Some options are dynamic and use an object schema. The most common is `reverseProxy`.
+## Options
 
 ### reverseProxy (Object)
 
@@ -75,6 +26,9 @@ Reverse proxy configuration. When `enabled = true`, the following fields are req
     - accessKey (String)
     - secretKey (String)
     - region (String)
+ - prepend (String) — optional; path to prepend to origin requests
+ - authorization (Object) — optional; used for origin authorization
+   - type (String) — e.g., "NONE"; additional fields may be introduced based on type
 
 Examples:
 
@@ -90,6 +44,10 @@ options = {
     ttl               = 3600
     useRobotsTxt      = false
     cacheByQueryParam = true
+    prepend           = "/static"
+    authorization     = {
+      type = "NONE"
+    }
   }
 }
 ```
@@ -114,6 +72,199 @@ options = {
 }
 ```
 
+### ttfb_timeout (Object)
+
+- enabled (Boolean)
+- value (Number) — time-to-first-byte timeout in seconds
+
+### contimeout (Object)
+
+- enabled (Boolean)
+- value (Number) — connect timeout in seconds
+
+### sharedshield (Object)
+
+- enabled (Boolean)
+- value (String) — shield location (e.g., "ORD")
+
+### bwthrottle (Object)
+
+- enabled (Boolean)
+- value (Number) — throttle rate
+
+### purgemode (Object)
+
+- enabled (Boolean)
+- value — can be provider/account specific. Two common shapes:
+  - String code (e.g., "2")
+  - Object flags (e.g., `{ exact = true, directory = true, extension = true }`)
+
+Examples:
+
+```hcl
+options = {
+  purgemode = {
+    enabled = true
+    value   = "2"
+  }
+}
+```
+
+```hcl
+options = {
+  purgemode = {
+    enabled = true
+    value = {
+      exact     = true
+      directory = true
+      extension = true
+    }
+  }
+}
+```
+
+### dirpurgeskip (Object)
+
+- enabled (Boolean)
+- value (Number)
+
+### skip_pserve_ext (Object)
+
+- enabled (Boolean)
+- value (List of String) — file extensions to skip ProtectServe
+
+### httpmethods (Object)
+
+- enabled (Boolean)
+- value (Object) — per-method allow flags
+
+Example:
+
+```hcl
+options = {
+  httpmethods = {
+    enabled = true
+    value = {
+      GET     = true
+      HEAD    = true
+      OPTIONS = true
+      PUT     = false
+      POST    = false
+      PATCH   = false
+      DELETE  = false
+    }
+  }
+}
+```
+
+### bwthrottlequery (Object)
+
+- enabled (Boolean)
+- value (List of String)
+
+### originhostheader (Object)
+
+- enabled (Boolean)
+- value (List of String)
+
+### redirect (Object)
+
+- enabled (Boolean)
+- value (String) — redirect URL
+
+### skip_encoding_ext (Object)
+
+- enabled (Boolean)
+- value (List of String)
+
+### custom_server_label (Object)
+
+- enabled (Boolean)
+- value (String)
+
+### allow_encoding_ext (Object)
+
+- enabled (Boolean)
+- value (List of String)
+
+### Other Options
+
+- protectServeKeyEnabled (Boolean)
+  - Enables ProtectServe. When set to true, the provider regenerates the ProtectServe key; when set to false, the key is deleted.
+
+- cors (Boolean)
+  - Enables CORS override for the service.
+
+- referrerBlocking (Boolean)
+  - Blocks requests based on referrer rules.
+
+- autoRedirect (Boolean)
+  - Automatically redirects HTTP to HTTPS.
+
+
+- brotli_compression (Boolean)
+  - Enables Brotli compression at the edge.
+
+- brotli_support (Boolean)
+  - Enables Brotli content negotiation support.
+
+- livestreaming (Boolean)
+  - Enables live streaming optimizations.
+
+- nocache (Boolean)
+  - Disables caching of responses.
+
+- cachebygeocountry (Boolean)
+  - Varies cache by geo country.
+
+- cachebyregion (Boolean)
+  - Varies cache by region.
+
+- cachebyreferer (Boolean)
+  - Varies cache by HTTP Referer.
+
+- normalizequerystring (Boolean)
+  - Normalizes query strings for cache keys.
+
+- allowretry (Boolean)
+  - Allows retrying failed origin requests.
+
+- linkpreheat (Boolean)
+  - Enables link preheating.
+
+- edgetoorigin (Boolean)
+  - Sends requests directly from edge to origin for certain flows.
+
+- followredirect (Boolean)
+  - Follows origin redirects.
+
+- purgenoquery (Boolean)
+  - Ignores query string when purging.
+
+- forceorigqstring (Boolean)
+  - Forces original query string to origin.
+
+- servestale (Boolean)
+  - Serves stale content when origin is unavailable.
+
+- cachepostrequests (Boolean)
+  - Enables caching of POST requests.
+
+- "send-xff" (Boolean)
+  - Sends X-Forwarded-For header. Note: the key contains a hyphen; in Terraform HCL map literals, quote the key (as shown).
+
+- usecfdootencoding (Boolean)
+  - Enables CF dot-encoding handling.
+
+- skip_urlencoding (Boolean)
+  - Skips URL encoding on the edge.
+
+- skip_encoding (Boolean)
+  - Skips content encoding.
+
+- hsts (Boolean)
+  - Enables HTTP Strict Transport Security.
+
 ## Notes and mappings
 
 - API/UI naming vs Terraform keys (for reference):
@@ -122,8 +273,7 @@ options = {
   - CORS Override → `cors`
   - Referrer Blocking → `referrerBlocking`
   - Auto HTTPS Redirect → `autoRedirect`
-  - Expiry Overrides → `expiryHeaders` (may not be available for every service)
 
 - The available options can vary by service and account. If an option is unsupported for a given service, the provider will report a validation error during apply.
 
-- Dynamic options may introduce additional fields or constraints over time. When in doubt, prefer the examples above and consult the provider changelog.
+- Some options may introduce additional fields or constraints over time. When in doubt, prefer the examples above and consult the provider changelog.
