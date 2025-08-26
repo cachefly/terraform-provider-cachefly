@@ -27,10 +27,6 @@ resource "cachefly_user" "support_user" {
   password              = "SecurePassword123!"
   password_change_required = true
   
-  # Service IDs the user should have access to
-  services = [
-    "681b3dc52715310035cb75d4"
-  ]
   
   # Permissions to grant to the user
   permissions = [
@@ -49,10 +45,7 @@ resource "cachefly_user" "billing_user" {
   password              = "SecurePassword123!"
   password_change_required = true
   
-  # Service IDs the user should have access to
-  services = [
-    "681b3dc52715310035cb75d4"
-  ]
+ 
   
   # Permissions to grant to the user
   permissions = [

@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/datasources"
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/resources"
@@ -59,7 +59,7 @@ func (p *CacheFlyProvider) Schema(ctx context.Context, req provider.SchemaReques
 				Sensitive:           true,
 			},
 			"base_url": schema.StringAttribute{
-				MarkdownDescription: "The base URL for the CacheFly API. Defaults to `https://api.cachefly.com/api/2.5`. Can also be set with the `CACHEFLY_BASE_URL` environment variable.",
+				MarkdownDescription: "The base URL for the CacheFly API. Defaults to `https://api.cachefly.com/api/2.6`. Can also be set with the `CACHEFLY_BASE_URL` environment variable.",
 				Optional:            true,
 			},
 		},
@@ -76,7 +76,7 @@ func (p *CacheFlyProvider) Configure(ctx context.Context, req provider.Configure
 
 	// Set default values and get from environment if not set
 	apiToken := getConfigValue(config.APIToken, "CACHEFLY_API_TOKEN", "")
-	baseURL := getConfigValue(config.BaseURL, "CACHEFLY_BASE_URL", "https://api.cachefly.com/api/2.5")
+	baseURL := getConfigValue(config.BaseURL, "CACHEFLY_BASE_URL", "https://api.cachefly.com/api/2.6")
 
 	// Validate required configuration
 	if apiToken == "" {
@@ -87,12 +87,6 @@ func (p *CacheFlyProvider) Configure(ctx context.Context, req provider.Configure
 		)
 		return
 	}
-
-	// Log configuration
-	tflog.Debug(ctx, "Configuring CacheFly provider", map[string]interface{}{
-		"base_url": baseURL,
-		"version":  p.version,
-	})
 
 	// Create CacheFly SDK client using the proper constructor
 	cacheflyClient := cachefly.NewClient(
@@ -124,10 +118,10 @@ func (p *CacheFlyProvider) Resources(ctx context.Context) []func() resource.Reso
 		resources.NewServiceResource,
 		resources.NewServiceDomainResource,
 		resources.NewOriginResource,
-		resources.NewServiceOptionsResource,
 		resources.NewUserResource,
 		resources.NewScriptConfigResource,
 		resources.NewCertificateResource,
+		resources.NewLogTargetResource,
 	}
 }
 
@@ -138,8 +132,9 @@ func (p *CacheFlyProvider) DataSources(ctx context.Context) []func() datasource.
 		datasources.NewServiceDomainsDataSource,
 		datasources.NewOriginDataSource,
 		datasources.NewOriginsDataSource,
-		datasources.NewServiceOptionsDataSource,
+		datasources.NewLogTargetsDataSource,
 		datasources.NewUsersDataSource,
+		datasources.NewDeliveryRegionsDataSource,
 	}
 }
 

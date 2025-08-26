@@ -4,20 +4,19 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
@@ -54,57 +53,76 @@ func (r *OriginResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "Type of origin (e.g., 'http', 's3', 'gcs').",
+				Description: "Type of origin ('WEB', 'GEO', 'FAILOVER', 'S3_BUCKET').",
 				Required:    true,
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the origin.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"host": schema.StringAttribute{
+			"hostname": schema.StringAttribute{
 				Description: "Hostname of the origin server.",
-				Required:    true,
+				Optional:    true,
 			},
 			"scheme": schema.StringAttribute{
 				Description: "Protocol scheme (HTTP, HTTPS, or FOLLOW).",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("HTTPS"),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"cache_by_query_param": schema.BoolAttribute{
 				Description: "Whether to cache content based on query parameters.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"gzip": schema.BoolAttribute{
 				Description: "Whether to enable gzip compression.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(true),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"ttl": schema.Int64Attribute{
+			"ttl": schema.Int32Attribute{
 				Description: "Time to live (TTL) in seconds for cached content.",
 				Optional:    true,
 				Computed:    true,
-				Default:     int64default.StaticInt64(86400), // 24 hours
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
-			"missed_ttl": schema.Int64Attribute{
+			"missed_ttl": schema.Int32Attribute{
 				Description: "TTL in seconds for missed (404/error) responses.",
 				Optional:    true,
 				Computed:    true,
-				Default:     int64default.StaticInt64(300), // 5 minutes
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
-			"connection_timeout": schema.Int64Attribute{
+			"connection_timeout": schema.Int32Attribute{
 				Description: "Connection timeout in seconds.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
-			"time_to_first_byte_timeout": schema.Int64Attribute{
+			"time_to_first_byte_timeout": schema.Int32Attribute{
 				Description: "Time to first byte timeout in seconds.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
 
 			// S3-specific attributes
@@ -167,55 +185,52 @@ func (r *OriginResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Build create request
 	createReq := api.CreateOriginRequest{
-		Type:     data.Type.ValueString(),
-		Hostname: data.Host.ValueString(),
+		Type: data.Type.ValueString(),
 	}
 
-	// Optional fields
-	if !data.Name.IsNull() && !data.Name.IsUnknown() {
-		createReq.Name = data.Name.ValueString()
+	if !data.Hostname.IsUnknown() {
+		if data.Type.ValueString() == "WEB" {
+			createReq.Hostname = data.Hostname.ValueStringPointer()
+		} else {
+			createReq.Host = data.Hostname.ValueStringPointer()
+		}
 	}
-	if !data.Scheme.IsNull() && !data.Scheme.IsUnknown() {
-		createReq.Scheme = data.Scheme.ValueString()
+	if !data.Name.IsUnknown() {
+		createReq.Name = data.Name.ValueStringPointer()
 	}
-	if !data.CacheByQueryParam.IsNull() && !data.CacheByQueryParam.IsUnknown() {
-		createReq.CacheByQueryParam = data.CacheByQueryParam.ValueBool()
+	if !data.Scheme.IsUnknown() {
+		createReq.Scheme = data.Scheme.ValueStringPointer()
 	}
-	if !data.Gzip.IsNull() && !data.Gzip.IsUnknown() {
-		createReq.Gzip = data.Gzip.ValueBool()
+	if !data.CacheByQueryParam.IsUnknown() {
+		createReq.CacheByQueryParam = data.CacheByQueryParam.ValueBoolPointer()
 	}
-	if !data.TTL.IsNull() && !data.TTL.IsUnknown() {
-		createReq.TTL = int(data.TTL.ValueInt64())
+	if !data.Gzip.IsUnknown() {
+		createReq.Gzip = data.Gzip.ValueBoolPointer()
 	}
-	if !data.MissedTTL.IsNull() && !data.MissedTTL.IsUnknown() {
-		createReq.MissedTTL = int(data.MissedTTL.ValueInt64())
+	if !data.TTL.IsUnknown() {
+		createReq.TTL = data.TTL.ValueInt32Pointer()
 	}
-	if !data.ConnectionTimeout.IsNull() && !data.ConnectionTimeout.IsUnknown() {
-		createReq.ConnectionTimeout = int(data.ConnectionTimeout.ValueInt64())
+	if !data.MissedTTL.IsUnknown() {
+		createReq.MissedTTL = data.MissedTTL.ValueInt32Pointer()
 	}
-	if !data.TimeToFirstByteTimeout.IsNull() && !data.TimeToFirstByteTimeout.IsUnknown() {
-		createReq.TimeToFirstByteTimeout = int(data.TimeToFirstByteTimeout.ValueInt64())
+	if !data.ConnectionTimeout.IsUnknown() {
+		createReq.ConnectionTimeout = data.ConnectionTimeout.ValueInt32Pointer()
 	}
-
-	// S3-specific fields
-	if !data.AccessKey.IsNull() && !data.AccessKey.IsUnknown() {
-		createReq.AccessKey = data.AccessKey.ValueString()
+	if !data.TimeToFirstByteTimeout.IsUnknown() {
+		createReq.TimeToFirstByteTimeout = data.TimeToFirstByteTimeout.ValueInt32Pointer()
 	}
-	if !data.SecretKey.IsNull() && !data.SecretKey.IsUnknown() {
-		createReq.SecretKey = data.SecretKey.ValueString()
+	if !data.AccessKey.IsUnknown() {
+		createReq.AccessKey = data.AccessKey.ValueStringPointer()
 	}
-	if !data.Region.IsNull() && !data.Region.IsUnknown() {
-		createReq.Region = data.Region.ValueString()
+	if !data.SecretKey.IsUnknown() {
+		createReq.SecretKey = data.SecretKey.ValueStringPointer()
 	}
-	if !data.SignatureVersion.IsNull() && !data.SignatureVersion.IsUnknown() {
-		createReq.SignatureVersion = data.SignatureVersion.ValueString()
+	if !data.Region.IsUnknown() {
+		createReq.Region = data.Region.ValueStringPointer()
 	}
-
-	tflog.Debug(ctx, "Creating origin", map[string]interface{}{
-		"type":     createReq.Type,
-		"hostname": createReq.Hostname,
-		"name":     createReq.Name,
-	})
+	if !data.SignatureVersion.IsUnknown() {
+		createReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
+	}
 
 	origin, err := r.client.Origins.Create(ctx, createReq)
 	if err != nil {
@@ -226,13 +241,7 @@ func (r *OriginResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// Map response to state
 	r.mapOriginToState(origin, &data)
-
-	tflog.Debug(ctx, "Origin created successfully", map[string]interface{}{
-		"origin_id": origin.ID,
-		"hostname":  origin.Hostname,
-	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -245,16 +254,16 @@ func (r *OriginResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	tflog.Debug(ctx, "Reading origin", map[string]interface{}{
-		"origin_id": data.ID.ValueString(),
-	})
-
 	origin, err := r.client.Origins.GetByID(ctx, data.ID.ValueString(), "")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Origin",
-			"Could not read origin ID "+data.ID.ValueString()+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Origin",
+				"Could not read origin ID "+data.ID.ValueString()+": "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -266,63 +275,67 @@ func (r *OriginResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 func (r *OriginResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.OriginResourceModel
+	var state models.OriginResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Build update request with only changed fields
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	updateReq := api.UpdateOriginRequest{}
 
-	if !data.Type.IsNull() && !data.Type.IsUnknown() {
-		updateReq.Type = data.Type.ValueString()
+	if !data.Type.Equal(state.Type) {
+		updateReq.Type = data.Type.ValueStringPointer()
 	}
-	if !data.Name.IsNull() && !data.Name.IsUnknown() {
-		updateReq.Name = data.Name.ValueString()
+	if !data.Name.Equal(state.Name) {
+		updateReq.Name = data.Name.ValueStringPointer()
 	}
-	if !data.Host.IsNull() && !data.Host.IsUnknown() {
-		updateReq.Hostname = data.Host.ValueString()
+	if !data.Scheme.Equal(state.Scheme) {
+		updateReq.Scheme = data.Scheme.ValueStringPointer()
 	}
-	if !data.Scheme.IsNull() && !data.Scheme.IsUnknown() {
-		updateReq.Scheme = data.Scheme.ValueString()
+	if !data.CacheByQueryParam.Equal(state.CacheByQueryParam) {
+		updateReq.CacheByQueryParam = data.CacheByQueryParam.ValueBoolPointer()
 	}
-	if !data.CacheByQueryParam.IsNull() && !data.CacheByQueryParam.IsUnknown() {
-		updateReq.CacheByQueryParam = data.CacheByQueryParam.ValueBool()
+	if !data.Gzip.Equal(state.Gzip) {
+		updateReq.Gzip = data.Gzip.ValueBoolPointer()
 	}
-	if !data.Gzip.IsNull() && !data.Gzip.IsUnknown() {
-		updateReq.Gzip = data.Gzip.ValueBool()
+	if !data.TTL.Equal(state.TTL) {
+		updateReq.TTL = data.TTL.ValueInt32Pointer()
 	}
-	if !data.TTL.IsNull() && !data.TTL.IsUnknown() {
-		updateReq.TTL = int(data.TTL.ValueInt64())
+	if !data.MissedTTL.Equal(state.MissedTTL) {
+		updateReq.MissedTTL = data.MissedTTL.ValueInt32Pointer()
 	}
-	if !data.MissedTTL.IsNull() && !data.MissedTTL.IsUnknown() {
-		updateReq.MissedTTL = int(data.MissedTTL.ValueInt64())
+	if !data.ConnectionTimeout.Equal(state.ConnectionTimeout) {
+		updateReq.ConnectionTimeout = data.ConnectionTimeout.ValueInt32Pointer()
 	}
-	if !data.ConnectionTimeout.IsNull() && !data.ConnectionTimeout.IsUnknown() {
-		updateReq.ConnectionTimeout = int(data.ConnectionTimeout.ValueInt64())
+	if !data.TimeToFirstByteTimeout.Equal(state.TimeToFirstByteTimeout) {
+		updateReq.TimeToFirstByteTimeout = data.TimeToFirstByteTimeout.ValueInt32Pointer()
 	}
-	if !data.TimeToFirstByteTimeout.IsNull() && !data.TimeToFirstByteTimeout.IsUnknown() {
-		updateReq.TimeToFirstByteTimeout = int(data.TimeToFirstByteTimeout.ValueInt64())
+	if !data.AccessKey.Equal(state.AccessKey) {
+		updateReq.AccessKey = data.AccessKey.ValueStringPointer()
 	}
-
-	// S3-specific fields
-	if !data.AccessKey.IsNull() && !data.AccessKey.IsUnknown() {
-		updateReq.AccessKey = data.AccessKey.ValueString()
+	if !data.SecretKey.Equal(state.SecretKey) {
+		updateReq.SecretKey = data.SecretKey.ValueStringPointer()
 	}
-	if !data.SecretKey.IsNull() && !data.SecretKey.IsUnknown() {
-		updateReq.SecretKey = data.SecretKey.ValueString()
+	if !data.Region.Equal(state.Region) {
+		updateReq.Region = data.Region.ValueStringPointer()
 	}
-	if !data.Region.IsNull() && !data.Region.IsUnknown() {
-		updateReq.Region = data.Region.ValueString()
-	}
-	if !data.SignatureVersion.IsNull() && !data.SignatureVersion.IsUnknown() {
-		updateReq.SignatureVersion = data.SignatureVersion.ValueString()
+	if !data.SignatureVersion.Equal(state.SignatureVersion) {
+		updateReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
 	}
 
-	tflog.Debug(ctx, "Updating origin", map[string]interface{}{
-		"origin_id": data.ID.ValueString(),
-	})
+	if !data.Hostname.Equal(state.Hostname) {
+		if data.Type.ValueString() == "WEB" {
+			updateReq.Hostname = data.Hostname.ValueStringPointer()
+		} else {
+			updateReq.Host = data.Hostname.ValueStringPointer()
+		}
+	}
 
 	origin, err := r.client.Origins.UpdateByID(ctx, data.ID.ValueString(), updateReq)
 	if err != nil {
@@ -333,7 +346,6 @@ func (r *OriginResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// Map response to state
 	r.mapOriginToState(origin, &data)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -347,10 +359,6 @@ func (r *OriginResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	tflog.Debug(ctx, "Deleting origin", map[string]interface{}{
-		"origin_id": data.ID.ValueString(),
-	})
-
 	err := r.client.Origins.Delete(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -360,7 +368,6 @@ func (r *OriginResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	tflog.Debug(ctx, "Origin deleted successfully")
 }
 
 func (r *OriginResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -371,47 +378,26 @@ func (r *OriginResource) ImportState(ctx context.Context, req resource.ImportSta
 func (r *OriginResource) mapOriginToState(origin *api.Origin, data *models.OriginResourceModel) {
 	data.ID = types.StringValue(origin.ID)
 	data.Type = types.StringValue(origin.Type)
-	data.Name = types.StringValue(origin.Name)
-	data.Host = types.StringValue(origin.Hostname)
-	data.Scheme = types.StringValue(origin.Scheme)
-	data.CacheByQueryParam = types.BoolValue(origin.CacheByQueryParam)
-	data.Gzip = types.BoolValue(origin.Gzip)
-	data.TTL = types.Int64Value(int64(origin.TTL))
-	data.MissedTTL = types.Int64Value(int64(origin.MissedTTL))
+	data.Name = types.StringPointerValue(origin.Name)
+	data.Scheme = types.StringPointerValue(origin.Scheme)
+	data.CacheByQueryParam = types.BoolPointerValue(origin.CacheByQueryParam)
+	data.Gzip = types.BoolPointerValue(origin.Gzip)
+	data.TTL = types.Int32PointerValue(origin.TTL)
+	data.MissedTTL = types.Int32PointerValue(origin.MissedTTL)
 	data.CreatedAt = types.StringValue(origin.CreatedAt)
 	data.UpdatedAt = types.StringValue(origin.UpdatedAt)
 
-	// Handle optional timeout fields
-	if origin.ConnectionTimeout > 0 {
-		data.ConnectionTimeout = types.Int64Value(int64(origin.ConnectionTimeout))
+	if origin.Type == "WEB" {
+		data.Hostname = types.StringPointerValue(origin.Hostname)
 	} else {
-		data.ConnectionTimeout = types.Int64Null()
-	}
-	if origin.TimeToFirstByteTimeout > 0 {
-		data.TimeToFirstByteTimeout = types.Int64Value(int64(origin.TimeToFirstByteTimeout))
-	} else {
-		data.TimeToFirstByteTimeout = types.Int64Null()
+		data.Hostname = types.StringPointerValue(origin.Host)
 	}
 
-	// Handle S3-specific fields
-	if origin.AccessKey != "" {
-		data.AccessKey = types.StringValue(origin.AccessKey)
-	} else {
-		data.AccessKey = types.StringNull()
-	}
-	if origin.SecretKey != "" {
-		data.SecretKey = types.StringValue(origin.SecretKey)
-	} else {
-		data.SecretKey = types.StringNull()
-	}
-	if origin.Region != "" {
-		data.Region = types.StringValue(origin.Region)
-	} else {
-		data.Region = types.StringNull()
-	}
-	if origin.SignatureVersion != "" {
-		data.SignatureVersion = types.StringValue(origin.SignatureVersion)
-	} else {
-		data.SignatureVersion = types.StringNull()
-	}
+	data.ConnectionTimeout = types.Int32PointerValue(origin.ConnectionTimeout)
+	data.TimeToFirstByteTimeout = types.Int32PointerValue(origin.TimeToFirstByteTimeout)
+
+	data.AccessKey = types.StringPointerValue(origin.AccessKey)
+	data.SecretKey = types.StringPointerValue(origin.SecretKey)
+	data.Region = types.StringPointerValue(origin.Region)
+	data.SignatureVersion = types.StringPointerValue(origin.SignatureVersion)
 }

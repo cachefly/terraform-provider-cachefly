@@ -3,7 +3,7 @@ package models
 import (
 	"context"
 
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -78,7 +78,7 @@ func (m *UserModel) ToSDKCreateRequest(ctx context.Context) *api.CreateUserReque
 		Email:                  m.Email.ValueString(),
 		FullName:               m.FullName.ValueString(),
 		Phone:                  m.Phone.ValueString(),
-		PasswordChangeRequired: m.PasswordChangeRequired.ValueBool(),
+		PasswordChangeRequired: m.PasswordChangeRequired.ValueBoolPointer(),
 		Services:               services,
 		Permissions:            permissions,
 	}
@@ -141,7 +141,7 @@ func (m *UserModel) FromSDKUser(ctx context.Context, user *api.User) {
 	m.Username = types.StringValue(user.Username)
 	m.Email = types.StringValue(user.Email)
 	m.FullName = types.StringValue(user.FullName)
-	m.Phone = types.StringValue(user.Phone)
+	m.Phone = types.StringPointerValue(user.Phone)
 	m.Status = types.StringValue(user.Status)
 	m.CreatedAt = types.StringValue(user.CreatedAt)
 	m.UpdatedAt = types.StringValue(user.UpdatedAt)

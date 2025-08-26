@@ -12,7 +12,7 @@ type ServiceDomainResourceModel struct {
 	ValidationMode   types.String `tfsdk:"validation_mode"`
 	ValidationTarget types.String `tfsdk:"validation_target"`
 	ValidationStatus types.String `tfsdk:"validation_status"`
-	Certificates     types.List   `tfsdk:"certificates"`
+	Certificates     types.Set    `tfsdk:"certificates"`
 	CreatedAt        types.String `tfsdk:"created_at"`
 	UpdatedAt        types.String `tfsdk:"updated_at"`
 }
@@ -26,7 +26,7 @@ type ServiceDomainDataSourceModel struct {
 	ValidationMode   types.String `tfsdk:"validation_mode"`
 	ValidationTarget types.String `tfsdk:"validation_target"`
 	ValidationStatus types.String `tfsdk:"validation_status"`
-	Certificates     types.List   `tfsdk:"certificates"`
+	Certificates     types.Set    `tfsdk:"certificates"`
 	CreatedAt        types.String `tfsdk:"created_at"`
 	UpdatedAt        types.String `tfsdk:"updated_at"`
 

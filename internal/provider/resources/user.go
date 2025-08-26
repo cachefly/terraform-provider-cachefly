@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -12,10 +13,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
@@ -67,7 +67,7 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"full_name": schema.StringAttribute{
 				Description: "Full name of the user.",
-				Required:    true,
+				Optional:    true,
 			},
 			"phone": schema.StringAttribute{
 				Description: "Phone number of the user.",
@@ -142,18 +142,16 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	// Build create request
 	createReq := api.CreateUserRequest{
-		Username: data.Username.ValueString(),
-		Password: data.Password.ValueString(),
-		Email:    data.Email.ValueString(),
-		FullName: data.FullName.ValueString(),
+		Username:               data.Username.ValueString(),
+		Password:               data.Password.ValueString(),
+		PasswordChangeRequired: data.PasswordChangeRequired.ValueBoolPointer(),
+		Email:                  data.Email.ValueString(),
+		FullName:               data.FullName.ValueString(),
 	}
 
 	// Optional fields
 	if !data.Phone.IsNull() && !data.Phone.IsUnknown() {
 		createReq.Phone = data.Phone.ValueString()
-	}
-	if !data.PasswordChangeRequired.IsNull() && !data.PasswordChangeRequired.IsUnknown() {
-		createReq.PasswordChangeRequired = data.PasswordChangeRequired.ValueBool()
 	}
 
 	// Convert Services set to string slice
@@ -178,11 +176,6 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 		createReq.Permissions = permissions
 	}
 
-	tflog.Debug(ctx, "Creating user", map[string]interface{}{
-		"username": createReq.Username,
-		"email":    createReq.Email,
-	})
-
 	user, err := r.client.Users.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -194,11 +187,6 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	// Map response to state
 	r.mapUserToState(user, &data)
-
-	tflog.Debug(ctx, "User created successfully", map[string]interface{}{
-		"user_id":  user.ID,
-		"username": user.Username,
-	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -214,16 +202,16 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	userID := data.ID.ValueString()
 
-	tflog.Debug(ctx, "Reading user", map[string]interface{}{
-		"user_id": userID,
-	})
-
 	user, err := r.client.Users.GetByID(ctx, userID, "")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly User",
-			"Could not read user with ID "+userID+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly User",
+				"Could not read user with ID "+userID+": "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -236,37 +224,38 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 // Update updates the resource and sets the updated Terraform state on success
 func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data models.UserModel
+	var state models.UserModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	userID := data.ID.ValueString()
 
-	// Build update request with only changed fields
 	updateReq := api.UpdateUserRequest{}
 
-	// Only set fields that have values (not null/unknown)
-	if !data.Password.IsNull() && !data.Password.IsUnknown() && data.Password.ValueString() != "" {
+	if !data.Password.Equal(state.Password) {
 		updateReq.Password = data.Password.ValueString()
 	}
-	if !data.Email.IsNull() && !data.Email.IsUnknown() {
+	if !data.Email.Equal(state.Email) {
 		updateReq.Email = data.Email.ValueString()
 	}
-	if !data.FullName.IsNull() && !data.FullName.IsUnknown() {
+	if !data.FullName.Equal(state.FullName) {
 		updateReq.FullName = data.FullName.ValueString()
 	}
-	if !data.Phone.IsNull() && !data.Phone.IsUnknown() {
+	if !data.Phone.Equal(state.Phone) {
 		updateReq.Phone = data.Phone.ValueString()
 	}
-	if !data.PasswordChangeRequired.IsNull() && !data.PasswordChangeRequired.IsUnknown() {
-		val := data.PasswordChangeRequired.ValueBool()
-		updateReq.PasswordChangeRequired = &val
-	}
 
-	// Convert Services set to string slice
-	if !data.Services.IsNull() && !data.Services.IsUnknown() {
+	updateReq.PasswordChangeRequired = data.PasswordChangeRequired.ValueBoolPointer()
+
+	if !data.Services.Equal(state.Services) {
 		var services []string
 		serviceElements := make([]types.String, 0, len(data.Services.Elements()))
 		data.Services.ElementsAs(ctx, &serviceElements, false)
@@ -276,8 +265,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		updateReq.Services = services
 	}
 
-	// Convert Permissions set to string slice
-	if !data.Permissions.IsNull() && !data.Permissions.IsUnknown() {
+	if !data.Permissions.Equal(state.Permissions) {
 		var permissions []string
 		permissionElements := make([]types.String, 0, len(data.Permissions.Elements()))
 		data.Permissions.ElementsAs(ctx, &permissionElements, false)
@@ -286,10 +274,6 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		}
 		updateReq.Permissions = permissions
 	}
-
-	tflog.Debug(ctx, "Updating user", map[string]interface{}{
-		"user_id": userID,
-	})
 
 	user, err := r.client.Users.UpdateByID(ctx, userID, updateReq)
 	if err != nil {
@@ -300,13 +284,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	// Map response to state
 	r.mapUserToState(user, &data)
-
-	tflog.Debug(ctx, "User updated successfully", map[string]interface{}{
-		"user_id":  user.ID,
-		"username": user.Username,
-	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -322,10 +300,6 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	userID := data.ID.ValueString()
 
-	tflog.Debug(ctx, "Deleting user", map[string]interface{}{
-		"user_id": userID,
-	})
-
 	err := r.client.Users.DeleteByID(ctx, userID)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -334,10 +308,6 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		)
 		return
 	}
-
-	tflog.Debug(ctx, "User deleted successfully", map[string]interface{}{
-		"user_id": userID,
-	})
 }
 
 // ImportState imports an existing resource into Terraform state
@@ -351,7 +321,7 @@ func (r *UserResource) mapUserToState(user *api.User, data *models.UserModel) {
 	data.Username = types.StringValue(user.Username)
 	data.Email = types.StringValue(user.Email)
 	data.FullName = types.StringValue(user.FullName)
-	data.Phone = types.StringValue(user.Phone)
+	data.Phone = types.StringPointerValue(user.Phone)
 	data.Status = types.StringValue(user.Status)
 	data.CreatedAt = types.StringValue(user.CreatedAt)
 	data.UpdatedAt = types.StringValue(user.UpdatedAt)

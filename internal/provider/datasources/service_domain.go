@@ -9,10 +9,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
@@ -66,7 +65,7 @@ func (d *ServiceDomainDataSource) Schema(ctx context.Context, req datasource.Sch
 				Description: "The current validation status of the domain.",
 				Computed:    true,
 			},
-			"certificates": schema.ListAttribute{
+			"certificates": schema.SetAttribute{
 				Description: "List of certificate IDs associated with this domain.",
 				ElementType: types.StringType,
 				Computed:    true,
@@ -112,12 +111,6 @@ func (d *ServiceDomainDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	tflog.Debug(ctx, "Reading service domain data source", map[string]interface{}{
-		"service_id": data.ServiceID.ValueString(),
-		"domain_id":  data.ID.ValueString(),
-	})
-
-	// Get the domain
 	domain, err := d.client.ServiceDomains.GetByID(
 		ctx,
 		data.ServiceID.ValueString(),
@@ -150,14 +143,14 @@ func (d *ServiceDomainDataSource) mapDomainToDataSource(domain *api.ServiceDomai
 	data.CreatedAt = types.StringValue(domain.CreatedAt)
 	data.UpdatedAt = types.StringValue(domain.UpdatedAt)
 
-	// Convert certificates slice to Terraform list
+	// Convert certificates slice to Terraform set
 	if len(domain.Certificates) > 0 {
 		certElements := make([]attr.Value, len(domain.Certificates))
 		for i, cert := range domain.Certificates {
 			certElements[i] = types.StringValue(cert)
 		}
-		data.Certificates, _ = types.ListValue(types.StringType, certElements)
+		data.Certificates, _ = types.SetValue(types.StringType, certElements)
 	} else {
-		data.Certificates = types.ListNull(types.StringType)
+		data.Certificates = types.SetNull(types.StringType)
 	}
 }

@@ -9,10 +9,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
@@ -87,7 +86,7 @@ func (d *ServiceDomainsDataSource) Schema(ctx context.Context, req datasource.Sc
 							Description: "The current validation status of the domain.",
 							Computed:    true,
 						},
-						"certificates": schema.ListAttribute{
+						"certificates": schema.SetAttribute{
 							Description: "List of certificate IDs associated with this domain.",
 							ElementType: types.StringType,
 							Computed:    true,
@@ -132,12 +131,6 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	tflog.Debug(ctx, "Reading service domains data source", map[string]interface{}{
-		"service_id": data.ServiceID.ValueString(),
-		"search":     data.Search.ValueString(),
-	})
-
-	// Build options
 	opts := api.ListServiceDomainsOptions{
 		Search:       data.Search.ValueString(),
 		ResponseType: data.ResponseType.ValueString(),
@@ -149,30 +142,42 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 	if !data.Limit.IsNull() {
 		opts.Limit = int(data.Limit.ValueInt64())
 	}
-
-	// Get the domains
-	domainsResp, err := d.client.ServiceDomains.List(ctx, data.ServiceID.ValueString(), opts)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Service Domains",
-			"Could not read service domains for service "+data.ServiceID.ValueString()+": "+err.Error(),
-		)
-		return
+	if opts.Limit <= 0 {
+		opts.Limit = 100
 	}
 
-	// Map response to data model
-	domains := make([]attr.Value, len(domainsResp.Domains))
-	for i, domain := range domainsResp.Domains {
-		// Convert certificates to list
-		var certsList types.List
+	var allDomains []api.ServiceDomain
+	for {
+		pageResp, err := d.client.ServiceDomains.List(ctx, data.ServiceID.ValueString(), opts)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Service Domains",
+				"Could not read service domains for service "+data.ServiceID.ValueString()+": "+err.Error(),
+			)
+			return
+		}
+
+		allDomains = append(allDomains, pageResp.Domains...)
+
+		fetched := len(pageResp.Domains)
+		total := pageResp.Meta.Count
+		opts.Offset += fetched
+		if fetched < opts.Limit || (total > 0 && opts.Offset == total) {
+			break
+		}
+	}
+
+	domains := make([]attr.Value, len(allDomains))
+	for i, domain := range allDomains {
+		var certsList types.Set
 		if len(domain.Certificates) > 0 {
 			certElements := make([]attr.Value, len(domain.Certificates))
 			for j, cert := range domain.Certificates {
 				certElements[j] = types.StringValue(cert)
 			}
-			certsList, _ = types.ListValue(types.StringType, certElements)
+			certsList, _ = types.SetValue(types.StringType, certElements)
 		} else {
-			certsList = types.ListNull(types.StringType)
+			certsList = types.SetNull(types.StringType)
 		}
 
 		domainObj, _ := types.ObjectValue(
@@ -183,7 +188,7 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 				"validation_mode":   types.StringType,
 				"validation_target": types.StringType,
 				"validation_status": types.StringType,
-				"certificates":      types.ListType{ElemType: types.StringType},
+				"certificates":      types.SetType{ElemType: types.StringType},
 				"created_at":        types.StringType,
 				"updated_at":        types.StringType,
 			},
@@ -211,7 +216,7 @@ func (d *ServiceDomainsDataSource) Read(ctx context.Context, req datasource.Read
 				"validation_mode":   types.StringType,
 				"validation_target": types.StringType,
 				"validation_status": types.StringType,
-				"certificates":      types.ListType{ElemType: types.StringType},
+				"certificates":      types.SetType{ElemType: types.StringType},
 				"created_at":        types.StringType,
 				"updated_at":        types.StringType,
 			},

@@ -8,10 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
@@ -152,7 +151,6 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	// Build list options
 	opts := api.ListUsersOptions{}
 
 	if !data.Search.IsNull() && !data.Search.IsUnknown() {
@@ -161,39 +159,47 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	if !data.Offset.IsNull() && !data.Offset.IsUnknown() {
 		opts.Offset = int(data.Offset.ValueInt64())
 	}
-	if !data.Limit.IsNull() && !data.Limit.IsUnknown() {
-		opts.Limit = int(data.Limit.ValueInt64())
-	}
 	if !data.ResponseType.IsNull() && !data.ResponseType.IsUnknown() {
 		opts.ResponseType = data.ResponseType.ValueString()
 	}
 
-	tflog.Debug(ctx, "Fetching users list", map[string]interface{}{
-		"search": opts.Search,
-		"offset": opts.Offset,
-		"limit":  opts.Limit,
-	})
-
-	// Fetch users from API
-	usersResp, err := d.client.Users.List(ctx, opts)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Users",
-			"Could not read users list: "+err.Error(),
-		)
-		return
+	if !data.Limit.IsNull() && !data.Limit.IsUnknown() {
+		opts.Limit = int(data.Limit.ValueInt64())
+	} else {
+		opts.Limit = 100
 	}
 
-	// Map response to state
+	var allUsers []api.User
+	totalCount := 0
+	for {
+		pageResp, err := d.client.Users.List(ctx, opts)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Users",
+				"Could not read users list: "+err.Error(),
+			)
+			return
+		}
+
+		if totalCount == 0 {
+			totalCount = pageResp.Meta.Count
+		}
+
+		allUsers = append(allUsers, pageResp.Users...)
+
+		fetched := len(pageResp.Users)
+		opts.Offset += fetched
+
+		if fetched < opts.Limit || pageResp.Meta.Count > 0 && opts.Offset == pageResp.Meta.Count {
+			break
+		}
+	}
+
+	usersResp := &api.ListUsersResponse{Meta: api.MetaInfo{Count: totalCount}, Users: allUsers}
 	d.mapUsersToState(usersResp, &data)
 
 	// Set computed ID
 	data.ID = types.StringValue("users")
-
-	tflog.Debug(ctx, "Users fetched successfully", map[string]interface{}{
-		"count": len(usersResp.Users),
-		"total": usersResp.Meta.Count,
-	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -211,7 +217,7 @@ func (d *UsersDataSource) mapUsersToState(usersResp *api.ListUsersResponse, data
 			Username:               types.StringValue(user.Username),
 			Email:                  types.StringValue(user.Email),
 			FullName:               types.StringValue(user.FullName),
-			Phone:                  types.StringValue(user.Phone),
+			Phone:                  types.StringPointerValue(user.Phone),
 			PasswordChangeRequired: types.BoolValue(user.PasswordChangeRequired),
 			Status:                 types.StringValue(user.Status),
 			CreatedAt:              types.StringValue(user.CreatedAt),

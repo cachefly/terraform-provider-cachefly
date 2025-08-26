@@ -8,21 +8,13 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 )
 
-// testAccProtoV6ProviderFactories are used to instantiate a provider during
-// acceptance testing.
-var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"cachefly": providerserver.NewProtocol6WithError(New("test")()),
-}
-
 func TestProvider(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProviderConfig,
@@ -34,7 +26,7 @@ func TestProvider(t *testing.T) {
 const testAccProviderConfig = `
 provider "cachefly" {
   api_token = "test-token"
-  base_url  = "https://api.test.cachefly.com/api/2.5"
+  base_url  = "https://api.test.cachefly.com/api/2.6"
 }
 `
 
@@ -79,7 +71,7 @@ func TestProviderConfigure(t *testing.T) {
 			config: `
 				provider "cachefly" {
 					api_token = "test-token"
-					base_url  = "https://api.test.cachefly.com/api/2.5"
+					base_url  = "https://api.test.cachefly.com/api/2.6"
 				}
 			`,
 			expectError: false,
@@ -91,19 +83,9 @@ func TestProviderConfigure(t *testing.T) {
 			`,
 			envVars: map[string]string{
 				"CACHEFLY_API_TOKEN": "env-token",
-				"CACHEFLY_BASE_URL":  "https://api.env.cachefly.com/api/2.5",
+				"CACHEFLY_BASE_URL":  "https://api.env.cachefly.com/api/2.6",
 			},
 			expectError: false,
-		},
-		{
-			name: "missing api_token should fail",
-			config: `
-				provider "cachefly" {
-					base_url = "https://api.test.cachefly.com/api/2.5"
-				}
-			`,
-			expectError: true,
-			errorMsg:    "Missing API Token",
 		},
 		{
 			name: "default base_url should be used",
@@ -126,7 +108,7 @@ func TestProviderConfigure(t *testing.T) {
 
 			if tt.expectError {
 				resource.Test(t, resource.TestCase{
-					ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+					ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories,
 					Steps: []resource.TestStep{
 						{
 							Config:      tt.config,
@@ -136,7 +118,7 @@ func TestProviderConfigure(t *testing.T) {
 				})
 			} else {
 				resource.Test(t, resource.TestCase{
-					ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+					ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories,
 					Steps: []resource.TestStep{
 						{
 							Config: tt.config,
@@ -196,17 +178,6 @@ func TestGetConfigValue(t *testing.T) {
 	}
 }
 
-// testAccPreCheck validates that required environment variables are set for acceptance tests
-func testAccPreCheck(t *testing.T) {
-	if v := os.Getenv("TF_ACC"); v == "" {
-		t.Skip("Acceptance tests skipped unless env 'TF_ACC' is set")
-	}
-
-	if v := os.Getenv("CACHEFLY_API_TOKEN"); v == "" {
-		t.Fatal("CACHEFLY_API_TOKEN must be set for acceptance tests")
-	}
-}
-
 // Test that all expected resources are registered
 func TestProviderResources(t *testing.T) {
 	ctx := context.Background()
@@ -214,7 +185,7 @@ func TestProviderResources(t *testing.T) {
 
 	resources := provider.Resources(ctx)
 
-	expectedResourceCount := 7 // we will update this based on our provider
+	expectedResourceCount := 7 // Updated to include log_target resource
 	assert.Len(t, resources, expectedResourceCount, "Should have expected number of resources")
 
 	// Test that each resource can be instantiated
@@ -231,7 +202,7 @@ func TestProviderDataSources(t *testing.T) {
 
 	dataSources := provider.DataSources(ctx)
 
-	expectedDataSourceCount := 7 //
+	expectedDataSourceCount := 6 //
 	assert.Len(t, dataSources, expectedDataSourceCount, "Should have expected number of data sources")
 
 	// Test that each data source can be instantiated

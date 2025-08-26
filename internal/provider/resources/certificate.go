@@ -3,17 +3,18 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
@@ -155,17 +156,16 @@ func (r *CertificateResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Convert to SDK create request
-	createReq := data.ToSDKCreateRequest(ctx)
+	createReq := api.CreateCertificateRequest{
+		Certificate:    data.Certificate.ValueString(),
+		CertificateKey: data.CertificateKey.ValueString(),
+	}
 
-	tflog.Debug(ctx, "Creating certificate", map[string]interface{}{
-		"has_certificate": createReq.Certificate != "",
-		"has_key":         createReq.CertificateKey != "",
-		"has_password":    createReq.Password != "",
-	})
+	if !data.Password.IsNull() && !data.Password.IsUnknown() && data.Password.ValueString() != "" {
+		createReq.Password = data.Password.ValueString()
+	}
 
-	// Create certificate via API
-	cert, err := r.client.Certificates.Create(ctx, *createReq)
+	cert, err := r.client.Certificates.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating CacheFly Certificate",
@@ -174,15 +174,7 @@ func (r *CertificateResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Map response to state, preserving sensitive input data
 	r.mapCertificateToState(cert, &data)
-
-	tflog.Debug(ctx, "Certificate created successfully", map[string]interface{}{
-		"certificate_id":      cert.ID,
-		"subject_common_name": cert.SubjectCommonName,
-		"expires":             cert.NotAfter,
-	})
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -197,16 +189,16 @@ func (r *CertificateResource) Read(ctx context.Context, req resource.ReadRequest
 
 	certID := data.ID.ValueString()
 
-	tflog.Debug(ctx, "Reading certificate", map[string]interface{}{
-		"certificate_id": certID,
-	})
-
 	cert, err := r.client.Certificates.GetByID(ctx, certID, "")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading CacheFly Certificate",
-			"Could not read certificate with ID "+certID+": "+err.Error(),
-		)
+		if strings.Contains(err.Error(), "404") {
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Reading CacheFly Certificate",
+				"Could not read certificate with ID "+certID+": "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -254,11 +246,6 @@ func (r *CertificateResource) Delete(ctx context.Context, req resource.DeleteReq
 
 	certID := data.ID.ValueString()
 
-	tflog.Debug(ctx, "Deleting certificate", map[string]interface{}{
-		"certificate_id": certID,
-	})
-
-	// Delete certificate via API
 	err := r.client.Certificates.Delete(ctx, certID)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -267,10 +254,6 @@ func (r *CertificateResource) Delete(ctx context.Context, req resource.DeleteReq
 		)
 		return
 	}
-
-	tflog.Debug(ctx, "Certificate deleted successfully", map[string]interface{}{
-		"certificate_id": certID,
-	})
 }
 
 // ImportState imports an existing resource into Terraform state
@@ -288,5 +271,47 @@ func (r *CertificateResource) ImportState(ctx context.Context, req resource.Impo
 
 // Helper function to map SDK Certificate to Terraform state
 func (r *CertificateResource) mapCertificateToState(cert *api.Certificate, data *models.CertificateModel) {
-	data.FromSDKCertificate(context.Background(), cert)
+	data.ID = types.StringValue(cert.ID)
+	data.SubjectCommonName = types.StringValue(cert.SubjectCommonName)
+	data.Expired = types.BoolValue(cert.Expired)
+	data.Expiring = types.BoolValue(cert.Expiring)
+	data.InUse = types.BoolValue(cert.InUse)
+	data.Managed = types.BoolValue(cert.Managed)
+	data.NotBefore = types.StringValue(cert.NotBefore)
+	data.NotAfter = types.StringValue(cert.NotAfter)
+	data.CreatedAt = types.StringValue(cert.CreatedAt)
+
+	// Convert SubjectNames slice to set
+	if len(cert.SubjectNames) > 0 {
+		subjectNameValues := make([]attr.Value, len(cert.SubjectNames))
+		for i, name := range cert.SubjectNames {
+			subjectNameValues[i] = types.StringValue(name)
+		}
+		data.SubjectNames = types.SetValueMust(types.StringType, subjectNameValues)
+	} else {
+		data.SubjectNames = types.SetValueMust(types.StringType, []attr.Value{})
+	}
+
+	// Convert Services slice to set
+	if len(cert.Services) > 0 {
+		serviceValues := make([]attr.Value, len(cert.Services))
+		for i, service := range cert.Services {
+			serviceValues[i] = types.StringValue(service)
+		}
+		data.Services = types.SetValueMust(types.StringType, serviceValues)
+	} else {
+		data.Services = types.SetValueMust(types.StringType, []attr.Value{})
+	}
+
+	// Convert Domains slice to set
+	if len(cert.Domains) > 0 {
+		domainValues := make([]attr.Value, len(cert.Domains))
+		for i, domain := range cert.Domains {
+			domainValues[i] = types.StringValue(domain)
+		}
+		data.Domains = types.SetValueMust(types.StringType, domainValues)
+	} else {
+		data.Domains = types.SetValueMust(types.StringType, []attr.Value{})
+	}
+
 }

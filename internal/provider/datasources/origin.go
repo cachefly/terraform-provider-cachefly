@@ -8,10 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
@@ -65,19 +64,19 @@ func (d *OriginDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 				Description: "Whether gzip compression is enabled.",
 				Computed:    true,
 			},
-			"ttl": schema.Int64Attribute{
+			"ttl": schema.Int32Attribute{
 				Description: "Time to live (TTL) in seconds for cached content.",
 				Computed:    true,
 			},
-			"missed_ttl": schema.Int64Attribute{
+			"missed_ttl": schema.Int32Attribute{
 				Description: "TTL in seconds for missed (404/error) responses.",
 				Computed:    true,
 			},
-			"connection_timeout": schema.Int64Attribute{
+			"connection_timeout": schema.Int32Attribute{
 				Description: "Connection timeout in seconds.",
 				Computed:    true,
 			},
-			"time_to_first_byte_timeout": schema.Int64Attribute{
+			"time_to_first_byte_timeout": schema.Int32Attribute{
 				Description: "Time to first byte timeout in seconds.",
 				Computed:    true,
 			},
@@ -146,11 +145,6 @@ func (d *OriginDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	tflog.Debug(ctx, "Reading origin data source", map[string]interface{}{
-		"origin_id": data.ID.ValueString(),
-	})
-
-	// Get the origin
 	origin, err := d.client.Origins.GetByID(
 		ctx,
 		data.ID.ValueString(),
@@ -174,47 +168,26 @@ func (d *OriginDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 func (d *OriginDataSource) mapOriginToDataSource(origin *api.Origin, data *models.OriginDataSourceModel) {
 	data.ID = types.StringValue(origin.ID)
 	data.Type = types.StringValue(origin.Type)
-	data.Name = types.StringValue(origin.Name)
-	data.Host = types.StringValue(origin.Hostname)
-	data.Scheme = types.StringValue(origin.Scheme)
-	data.CacheByQueryParam = types.BoolValue(origin.CacheByQueryParam)
-	data.Gzip = types.BoolValue(origin.Gzip)
-	data.TTL = types.Int64Value(int64(origin.TTL))
-	data.MissedTTL = types.Int64Value(int64(origin.MissedTTL))
+	data.Name = types.StringPointerValue(origin.Name)
+	data.Scheme = types.StringPointerValue(origin.Scheme)
+	data.CacheByQueryParam = types.BoolPointerValue(origin.CacheByQueryParam)
+	data.Gzip = types.BoolPointerValue(origin.Gzip)
+	data.TTL = types.Int32PointerValue(origin.TTL)
+	data.MissedTTL = types.Int32PointerValue(origin.MissedTTL)
 	data.CreatedAt = types.StringValue(origin.CreatedAt)
 	data.UpdatedAt = types.StringValue(origin.UpdatedAt)
 
-	// Handle optional timeout fields
-	if origin.ConnectionTimeout > 0 {
-		data.ConnectionTimeout = types.Int64Value(int64(origin.ConnectionTimeout))
+	if origin.Type == "WEB" {
+		data.Hostname = types.StringPointerValue(origin.Hostname)
 	} else {
-		data.ConnectionTimeout = types.Int64Null()
-	}
-	if origin.TimeToFirstByteTimeout > 0 {
-		data.TimeToFirstByteTimeout = types.Int64Value(int64(origin.TimeToFirstByteTimeout))
-	} else {
-		data.TimeToFirstByteTimeout = types.Int64Null()
+		data.Hostname = types.StringPointerValue(origin.Host)
 	}
 
-	// Handle S3-specific fields
-	if origin.AccessKey != "" {
-		data.AccessKey = types.StringValue(origin.AccessKey)
-	} else {
-		data.AccessKey = types.StringNull()
-	}
-	if origin.SecretKey != "" {
-		data.SecretKey = types.StringValue(origin.SecretKey)
-	} else {
-		data.SecretKey = types.StringNull()
-	}
-	if origin.Region != "" {
-		data.Region = types.StringValue(origin.Region)
-	} else {
-		data.Region = types.StringNull()
-	}
-	if origin.SignatureVersion != "" {
-		data.SignatureVersion = types.StringValue(origin.SignatureVersion)
-	} else {
-		data.SignatureVersion = types.StringNull()
-	}
+	data.ConnectionTimeout = types.Int32PointerValue(origin.ConnectionTimeout)
+	data.TimeToFirstByteTimeout = types.Int32PointerValue(origin.TimeToFirstByteTimeout)
+
+	data.AccessKey = types.StringPointerValue(origin.AccessKey)
+	data.SecretKey = types.StringPointerValue(origin.SecretKey)
+	data.Region = types.StringPointerValue(origin.Region)
+	data.SignatureVersion = types.StringPointerValue(origin.SignatureVersion)
 }

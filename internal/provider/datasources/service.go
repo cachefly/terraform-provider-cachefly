@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/cachefly/cachefly-go-sdk/pkg/cachefly"
-	api "github.com/cachefly/cachefly-go-sdk/pkg/cachefly/api/v2_5"
+	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
+	api "github.com/cachefly/cachefly-sdk-go/pkg/cachefly/api/v2_6"
 
 	"github.com/cachefly/terraform-provider-cachefly/internal/provider/models"
 )
@@ -69,6 +69,10 @@ func (d *ServiceDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 			},
 			"configuration_mode": schema.StringAttribute{
 				Description: "The configuration mode of the service.",
+				Computed:    true,
+			},
+			"options": schema.DynamicAttribute{
+				Description: "Service options configuration as key-value pairs returned by the API.",
 				Computed:    true,
 			},
 			"status": schema.StringAttribute{
@@ -156,19 +160,8 @@ func (d *ServiceDataSource) Read(ctx context.Context, req datasource.ReadRequest
 				includeFeatures = data.IncludeFeatures.ValueBool()
 			}
 
-			tflog.Debug(ctx, "Looking up service by ID with options", map[string]interface{}{
-				"id":               serviceID,
-				"response_type":    responseType,
-				"include_features": includeFeatures,
-			})
-
 			service, err = d.client.Services.Get(ctx, serviceID, responseType, includeFeatures)
 		} else {
-			// Use simple GetByID() method
-			tflog.Debug(ctx, "Looking up service by ID", map[string]interface{}{
-				"id": serviceID,
-			})
-
 			service, err = d.client.Services.GetByID(ctx, serviceID)
 		}
 
@@ -184,30 +177,41 @@ func (d *ServiceDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		// Look up by unique name - we need to list services and filter
 		uniqueName := data.UniqueName.ValueString()
 
-		tflog.Debug(ctx, "Looking up service by unique name", map[string]interface{}{
-			"unique_name": uniqueName,
-		})
-
 		// List all services and find the one with matching unique name
 		listOptions := api.ListOptions{
-			Limit: 100, // Get a large batch to avoid pagination issues
+			Limit:  100, // Fetch in pages
+			Offset: 0,
 		}
 
-		listResp, err := d.client.Services.List(ctx, listOptions)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error Listing CacheFly Services",
-				"Could not list services to find by unique name: "+err.Error(),
-			)
-			return
-		}
-
-		// Find service with matching unique name
 		found := false
-		for _, svc := range listResp.Services {
-			if svc.UniqueName == uniqueName {
-				service = &svc
-				found = true
+		for {
+			listResp, err := d.client.Services.List(ctx, listOptions)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error Listing CacheFly Services",
+					"Could not list services to find by unique name: "+err.Error(),
+				)
+				return
+			}
+
+			// Find service with matching unique name in this page
+			for i := range listResp.Services {
+				if listResp.Services[i].UniqueName == uniqueName {
+					service = &listResp.Services[i]
+					found = true
+					break
+				}
+			}
+
+			if found {
+				break
+			}
+
+			fetched := len(listResp.Services)
+
+			listOptions.Offset += fetched
+
+			if fetched < listOptions.Limit || listResp.Meta.Count > 0 && listOptions.Offset == listResp.Meta.Count {
 				break
 			}
 		}
@@ -231,12 +235,98 @@ func (d *ServiceDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	data.CreatedAt = types.StringValue(service.CreatedAt)
 	data.UpdatedAt = types.StringValue(service.UpdatedAt)
 
-	tflog.Debug(ctx, "Successfully read service data", map[string]interface{}{
-		"id":          service.ID,
-		"unique_name": service.UniqueName,
-		"status":      service.Status,
-	})
+	// Load and map service options from API
+	allOptions, err := d.client.ServiceOptions.GetOptions(ctx, service.ID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading Service Options",
+			"Could not read service options: "+err.Error(),
+		)
+		return
+	}
+
+	if err := setOptionsFromAPI(&data, allOptions); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Converting Service Options",
+			"Could not convert service options: "+err.Error(),
+		)
+		return
+	}
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// setOptionsFromAPI converts API ServiceOptions directly to the DataSource model's Options field
+func setOptionsFromAPI(data *models.ServiceDataSourceModel, options api.ServiceOptions) error {
+	if len(options) > 0 {
+		elements := make(map[string]attr.Value)
+		attrTypes := make(map[string]attr.Type)
+
+		for key, value := range options {
+			convertedValue, attrType := convertInterfaceToAttrValue(value)
+			elements[key] = convertedValue
+			attrTypes[key] = attrType
+		}
+
+		objValue, diags := types.ObjectValue(attrTypes, elements)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert options to object: %v", diags.Errors())
+		}
+
+		data.Options = types.DynamicValue(objValue)
+	} else {
+		data.Options = types.DynamicNull()
+	}
+
+	return nil
+}
+
+// convertInterfaceToAttrValue converts interface{} to attr.Value and attr.Type
+func convertInterfaceToAttrValue(value interface{}) (attr.Value, attr.Type) {
+	switch v := value.(type) {
+	case string:
+		return types.StringValue(v), types.StringType
+	case bool:
+		return types.BoolValue(v), types.BoolType
+	case int:
+		return types.Int64Value(int64(v)), types.Int64Type
+	case int64:
+		return types.Int64Value(v), types.Int64Type
+	case float64:
+		return types.Float64Value(v), types.Float64Type
+	case map[string]interface{}:
+		nestedElements := make(map[string]attr.Value)
+		nestedAttrTypes := make(map[string]attr.Type)
+
+		for nestedKey, nestedValue := range v {
+			nestedAttrValue, nestedAttrType := convertInterfaceToAttrValue(nestedValue)
+			nestedElements[nestedKey] = nestedAttrValue
+			nestedAttrTypes[nestedKey] = nestedAttrType
+		}
+
+		objValue, _ := types.ObjectValue(nestedAttrTypes, nestedElements)
+		return objValue, types.ObjectType{AttrTypes: nestedAttrTypes}
+	case []interface{}:
+		if len(v) == 0 {
+			listValue, _ := types.ListValue(types.StringType, []attr.Value{})
+			return listValue, types.ListType{ElemType: types.StringType}
+		}
+
+		listElements := make([]attr.Value, len(v))
+		var elemType attr.Type = types.StringType
+
+		for i, item := range v {
+			itemValue, itemType := convertInterfaceToAttrValue(item)
+			listElements[i] = itemValue
+			if i == 0 {
+				elemType = itemType
+			}
+		}
+
+		listValue, _ := types.ListValue(elemType, listElements)
+		return listValue, types.ListType{ElemType: elemType}
+	default:
+		return types.StringValue(fmt.Sprintf("%v", v)), types.StringType
+	}
 }
