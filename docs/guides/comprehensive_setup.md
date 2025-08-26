@@ -44,7 +44,7 @@ terraform apply
 terraform destroy
 ```
 
-```terraform
+```hcl
 # ===================================================================
 # CacheFly CDN - Complete Feature Showcase
 # A comprehensive example demonstrating available CDN features

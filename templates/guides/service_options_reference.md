@@ -7,7 +7,6 @@ page_title: "Service options reference"
 
 This page lists the supported `options` for the `cachefly_service` resource and how to configure them in Terraform.
 
-See also: `../resources/service.md` → attribute `options`.
 
 ## Options
 

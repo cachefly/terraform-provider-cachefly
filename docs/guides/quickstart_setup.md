@@ -44,7 +44,7 @@ terraform destroy
 ```
 
 
-```terraform
+```hcl
 # ===================================================================
 # CacheFly CDN - example demonstrating  Quickstart CDN service
 # 
