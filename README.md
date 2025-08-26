@@ -131,12 +131,6 @@ go test -v -count=1 ./internal/provider/
 
 For detailed documentation on all resources and data sources, visit the [Terraform Registry documentation](https://registry.terraform.io/providers/cachefly/cachefly/latest).
 
-## Output Example
-
-The following screenshot shows Terraform in action, deploying a new service and retrieving the newly created service:
-
-![Terraform output for CacheFly services](./hcl_output.png)
-
 ## Requirements
 
 - Terraform >= 0.13
