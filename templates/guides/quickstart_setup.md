@@ -91,3 +91,4 @@ output "my_cdn_info" {
     created_at  = cachefly_service.my_cdn.created_at
   }
 }
+```

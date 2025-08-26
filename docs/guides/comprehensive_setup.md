@@ -590,3 +590,4 @@ output "setup_status" {
     users_created    = "✅ 2 users created"
   }
 }
+```
