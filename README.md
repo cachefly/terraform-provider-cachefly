@@ -8,7 +8,7 @@
 
 # Terraform Provider for CacheFly
 
-A Golang Terraform provider built using CacheFly Go SDK [GoLang SDK for CacheFly v1.0](https://github.com/cachefly/cachefly-sdk-go). Supports CacheFly API (2.6.0)
+A Golang Terraform provider built using CacheFly Go SDK [GoLang SDK for CacheFly v1.1.0](https://github.com/cachefly/cachefly-sdk-go). Supports CacheFly API (2.6.0)
 
 ## About CacheFly
 
