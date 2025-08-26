@@ -14,8 +14,6 @@ require (
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
 
-replace github.com/cachefly/cachefly-sdk-go => ../cachefly-sdk-go
-
 require (
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/agext/levenshtein v1.2.2 // indirect
