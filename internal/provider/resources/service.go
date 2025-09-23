@@ -103,6 +103,9 @@ func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"created_at": schema.StringAttribute{
 				Description: "The timestamp when the service was created.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"updated_at": schema.StringAttribute{
 				Description: "The timestamp when the service was last updated.",
@@ -491,8 +494,6 @@ func (r *ServiceResource) setOptionsFromAPI(data *models.ServiceResourceModel, o
 		}
 
 		data.Options = types.DynamicValue(objValue)
-	} else {
-		data.Options = types.DynamicNull()
 	}
 
 	return nil
@@ -545,23 +546,21 @@ func convertInterfaceToAttrValue(value interface{}) (attr.Value, attr.Type) {
 		return objValue, types.ObjectType{AttrTypes: nestedAttrTypes}
 	case []interface{}:
 		if len(v) == 0 {
-			listValue, _ := types.ListValue(types.StringType, []attr.Value{})
-			return listValue, types.ListType{ElemType: types.StringType}
+			tupleValue, _ := types.TupleValue([]attr.Type{}, []attr.Value{})
+			return tupleValue, types.TupleType{ElemTypes: []attr.Type{}}
 		}
 
-		listElements := make([]attr.Value, len(v))
-		var elemType attr.Type = types.StringType
+		tupleElements := make([]attr.Value, len(v))
+		elemTypes := make([]attr.Type, len(v))
 
 		for i, item := range v {
 			itemValue, itemType := convertInterfaceToAttrValue(item)
-			listElements[i] = itemValue
-			if i == 0 {
-				elemType = itemType
-			}
+			tupleElements[i] = itemValue
+			elemTypes[i] = itemType
 		}
 
-		listValue, _ := types.ListValue(elemType, listElements)
-		return listValue, types.ListType{ElemType: elemType}
+		tupleValue, _ := types.TupleValue(elemTypes, tupleElements)
+		return tupleValue, types.TupleType{ElemTypes: elemTypes}
 	default:
 		return types.StringValue(fmt.Sprintf("%v", v)), types.StringType
 	}
