@@ -52,7 +52,6 @@ resource "cachefly_service" "yellow_web_app" {
   unique_name        = "yellow-web-app-dev"
   description        = "Web application CDN for example.com"
   auto_ssl           = true  
-  configuration_mode = "API_RULES_AND_OPTIONS"
 }
 
 

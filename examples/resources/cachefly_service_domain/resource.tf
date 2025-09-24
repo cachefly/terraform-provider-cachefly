@@ -50,7 +50,6 @@ resource "cachefly_service" "web_app" {
   unique_name        = "${local.name_prefix}-web-05"
   description        = "Web application CDN for ${var.project_name}"
   auto_ssl           = true
-  configuration_mode = "API_RULES_AND_OPTIONS"
 }
 
 # API service 
@@ -59,7 +58,6 @@ resource "cachefly_service" "api" {
   unique_name        = "${local.name_prefix}-api-05"
   description        = "API CDN for ${var.project_name}"
   auto_ssl           = true
-  configuration_mode = "API_RULES_AND_OPTIONS"
 }
 
 # Static assets service
@@ -68,7 +66,6 @@ resource "cachefly_service" "assets" {
   unique_name        = "${local.name_prefix}-assets-05"
   description        = "Static assets CDN for ${var.project_name}"
   auto_ssl           = true
-  configuration_mode = "API_RULES_AND_OPTIONS"
 }
 
 # ===================================================================

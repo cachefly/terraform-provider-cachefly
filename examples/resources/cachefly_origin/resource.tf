@@ -22,7 +22,7 @@ provider "cachefly" {
 resource "cachefly_origin" "web_server" {
   type                       = "WEB"
   name                       = "main-web-server"
-  host                       = "web.example.com"
+  hostname                   = "web.example.com"
   scheme                     = "HTTPS"
   cache_by_query_param       = false
   gzip                       = true
@@ -36,7 +36,7 @@ resource "cachefly_origin" "web_server" {
 resource "cachefly_origin" "api_server" {
   type                 = "WEB"
   name                 = "api-server"
-  host                 = "api.example.com"
+  hostname             = "api.example.com"
   scheme               = "HTTPS"
   cache_by_query_param = true  # Cache API responses by query params
   gzip                 = true
@@ -48,7 +48,7 @@ resource "cachefly_origin" "api_server" {
 resource "cachefly_origin" "dev_server" {
   type                 = "WEB"
   name                 = "dev-server"
-  host                 = "dev.example.com"
+  hostname             = "dev.example.com"
   scheme               = "HTTPS"
   cache_by_query_param = false
   gzip                 = false  # Disable compression for development
@@ -78,25 +78,25 @@ output "origins_summary" {
   description = "Summary of all created origins"
   value = {
     web_server = {
-      id   = cachefly_origin.web_server.id
-      name = cachefly_origin.web_server.name
-      host = cachefly_origin.web_server.host
-      type = cachefly_origin.web_server.type
-      ttl  = cachefly_origin.web_server.ttl
+      id       = cachefly_origin.web_server.id
+      name     = cachefly_origin.web_server.name
+      hostname = cachefly_origin.web_server.hostname
+      type     = cachefly_origin.web_server.type
+      ttl      = cachefly_origin.web_server.ttl
     }
     api_server = {
-      id   = cachefly_origin.api_server.id
-      name = cachefly_origin.api_server.name
-      host = cachefly_origin.api_server.host
-      type = cachefly_origin.api_server.type
-      ttl  = cachefly_origin.api_server.ttl
+      id       = cachefly_origin.api_server.id
+      name     = cachefly_origin.api_server.name
+      hostname = cachefly_origin.api_server.hostname
+      type     = cachefly_origin.api_server.type
+      ttl      = cachefly_origin.api_server.ttl
     }
     dev_server = {
-      id   = cachefly_origin.dev_server.id
-      name = cachefly_origin.dev_server.name
-      host = cachefly_origin.dev_server.host
-      type = cachefly_origin.dev_server.type
-      ttl  = cachefly_origin.dev_server.ttl
+      id       = cachefly_origin.dev_server.id
+      name     = cachefly_origin.dev_server.name
+      hostname = cachefly_origin.dev_server.hostname
+      type     = cachefly_origin.dev_server.type
+      ttl      = cachefly_origin.dev_server.ttl
     }
   }
 }
