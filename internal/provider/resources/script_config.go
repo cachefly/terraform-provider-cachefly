@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -83,6 +84,7 @@ func (r *ScriptConfigResource) Schema(ctx context.Context, req resource.SchemaRe
 				Description: "Whether the script config should be activated. Defaults to true.",
 				Optional:    true,
 				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"purpose": schema.StringAttribute{
 				Description: "Purpose of the script config definition.",
@@ -262,7 +264,7 @@ func (r *ScriptConfigResource) Update(ctx context.Context, req resource.UpdateRe
 			}
 			resp.Diagnostics.AddError(
 				fmt.Sprintf("Error %sing CacheFly Script Config", action),
-				fmt.Sprintf("Could not %s script config with ID %s: %s", action, configID, err.Error()),
+				fmt.Sprintf("Could not %se script config with ID %s: %s", action, configID, err.Error()),
 			)
 			return
 		}
@@ -313,7 +315,7 @@ func (r *ScriptConfigResource) mapScriptConfigToState(config *api.ScriptConfig, 
 	data.UseSchema = types.BoolValue(config.UseSchema)
 	data.DataModel = types.StringValue(config.DataModel)
 
-	if config.Status == "ACTIVATED" {
+	if config.Status == "ACTIVE" {
 		data.Activated = types.BoolValue(true)
 	} else {
 		data.Activated = types.BoolValue(false)
