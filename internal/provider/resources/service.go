@@ -25,6 +25,7 @@ var (
 	_ resource.Resource                = &ServiceResource{}
 	_ resource.ResourceWithConfigure   = &ServiceResource{}
 	_ resource.ResourceWithImportState = &ServiceResource{}
+	_ resource.ResourceWithModifyPlan  = &ServiceResource{}
 )
 
 func NewServiceResource() resource.Resource {
@@ -417,6 +418,83 @@ func (r *ServiceResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+// ModifyPlan suppresses no-op updates caused by type-only differences in the
+// dynamic "options" attribute (e.g. a config-declared list(string) versus a
+// tuple stored in state by older provider versions). Terraform
+// explicitly permit a planned value that conflicts with configuration when it
+// exactly matches the prior state, as a signal that the two are functionally
+// equivalent; returning the prior state wholesale turns the plan into a no-op
+// so no phantom update (and no server-side updatedAt bump) ever happens.
+func (r *ServiceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Only in-place updates are eligible; skip create and destroy plans.
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan, state models.ServiceResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Practitioner-owned attributes are never marked unknown by the
+	// framework; an unknown here comes from unresolved config expressions,
+	// i.e. a genuine pending change that must not be suppressed.
+	if plan.Options.IsUnknown() || plan.TLSProfile.IsUnknown() || plan.DeliveryRegion.IsUnknown() {
+		return
+	}
+	if !plan.TLSProfile.Equal(state.TLSProfile) || !plan.DeliveryRegion.Equal(state.DeliveryRegion) {
+		return
+	}
+	if !plan.Name.Equal(state.Name) || !plan.UniqueName.Equal(state.UniqueName) {
+		return
+	}
+
+	// Computed (and optional+computed) attributes: an unknown value is a
+	// framework marking artifact of the suspected change, not a change by
+	// itself; a known value that differs from state is a real change.
+	for _, pair := range []struct{ planV, stateV attr.Value }{
+		{plan.ID, state.ID},
+		{plan.Description, state.Description},
+		{plan.AutoSSL, state.AutoSSL},
+		{plan.ConfigurationMode, state.ConfigurationMode},
+		{plan.Status, state.Status},
+		{plan.CreatedAt, state.CreatedAt},
+		{plan.UpdatedAt, state.UpdatedAt},
+	} {
+		if pair.planV.IsUnknown() {
+			continue
+		}
+		if !pair.planV.Equal(pair.stateV) {
+			return
+		}
+	}
+
+	// Options: semantic comparison. Same values in a different dynamic type
+	// representation (list vs tuple, int vs float) are not a change. Nested
+	// unknowns are dropped by ToAPIServiceOptions and therefore show up as a
+	// difference, which correctly prevents suppression.
+	planOptions, err := plan.ToAPIServiceOptions()
+	if err != nil {
+		return
+	}
+	stateOptions, err := state.ToAPIServiceOptions()
+	if err != nil {
+		return
+	}
+	if plan.Options.IsNull() != state.Options.IsNull() {
+		return
+	}
+	if !optionValuesEqual(map[string]interface{}(planOptions), map[string]interface{}(stateOptions)) {
+		return
+	}
+
+	// Nothing genuinely changes: return the prior state as the plan, which
+	// core recognizes as a no-op.
+	resp.Plan.Raw = req.State.Raw.Copy()
+}
+
 func (r *ServiceResource) handleServiceOptionsRead(ctx context.Context, data *models.ServiceResourceModel) error {
 	serviceID := data.ID.ValueString()
 	// if data.Options.IsNull() || data.Options.IsUnknown() {
@@ -457,11 +535,81 @@ func (r *ServiceResource) handleServiceOptionsRead(ctx context.Context, data *mo
 		}
 	}
 
+	// When the API reports no semantic change, keep the state value untouched.
+	//
+	// Rebuilding the dynamic options value from API JSON guesses types that
+	// the config may have declared differently (JSON arrays carry no
+	// list/tuple distinction and are rebuilt as tuples, while the config may
+	// type them as lists). Such a type-only difference is invisible in
+	// rendered plans but makes Terraform/OpenTofu report phantom drift on
+	// every refresh and plan no-op in-place updates. The config's typing is
+	// authoritative for this Optional attribute, so Read must preserve the
+	// stored representation whenever the values are semantically equal.
+	if optionValuesEqual(map[string]interface{}(currentOptions), map[string]interface{}(managedOptions)) {
+		return nil
+	}
+
 	if err := r.setOptionsFromAPI(data, managedOptions); err != nil {
 		return fmt.Errorf("could not convert managed options: %w", err)
 	}
 
 	return nil
+}
+
+// optionValuesEqual reports whether two option values represent the same
+// data. Unlike compareOptionValues, it compares numbers numerically: values
+// read back from state carry Go int (see ToAPIServiceOptions), while values
+// decoded from API JSON carry float64, and those must compare as equal.
+func optionValuesEqual(a, b interface{}) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+
+	if aMap, ok := a.(map[string]interface{}); ok {
+		bMap, ok := b.(map[string]interface{})
+		if !ok || len(aMap) != len(bMap) {
+			return false
+		}
+		for key, aVal := range aMap {
+			bVal, exists := bMap[key]
+			if !exists || !optionValuesEqual(aVal, bVal) {
+				return false
+			}
+		}
+		return true
+	}
+
+	if aSlice, ok := a.([]interface{}); ok {
+		bSlice, ok := b.([]interface{})
+		if !ok || len(aSlice) != len(bSlice) {
+			return false
+		}
+		for i := range aSlice {
+			if !optionValuesEqual(aSlice[i], bSlice[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	if aNum, aOk := numericValue(a); aOk {
+		bNum, bOk := numericValue(b)
+		return bOk && aNum == bNum
+	}
+
+	return a == b
+}
+
+func numericValue(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case float64:
+		return n, true
+	}
+	return 0, false
 }
 
 // isPostImportRead detects if this is a read immediately after import
