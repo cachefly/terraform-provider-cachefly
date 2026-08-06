@@ -6,13 +6,18 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/cachefly/cachefly-sdk-go/pkg/cachefly"
@@ -23,8 +28,27 @@ import (
 
 // satisfy framework interfaces.
 var (
-	_ resource.Resource                = &LogTargetResource{}
-	_ resource.ResourceWithImportState = &LogTargetResource{}
+	_ resource.Resource                   = &LogTargetResource{}
+	_ resource.ResourceWithImportState    = &LogTargetResource{}
+	_ resource.ResourceWithValidateConfig = &LogTargetResource{}
+)
+
+// Per-type field applicability, used to validate configurations before they
+// reach the API (the API rejects fields that do not belong to the chosen
+// type, but with less helpful error messages).
+var (
+	logTargetTypeSpecificFields = map[string][]string{
+		"S3_BUCKET":     {"endpoint", "region", "bucket", "access_key", "secret_key", "signature_version"},
+		"GOOGLE_BUCKET": {"bucket", "json_key"},
+		"AZURE_BLOB":    {"endpoint_protocol", "endpoint_suffix", "account_name", "account_key", "container_name", "prefix"},
+		"HTTP":          {"uri", "method", "auth", "username", "password", "token"},
+	}
+	logTargetRequiredFields = map[string][]string{
+		"S3_BUCKET":     {"region", "bucket", "access_key", "secret_key"},
+		"GOOGLE_BUCKET": {"bucket", "json_key"},
+		"AZURE_BLOB":    {"account_name", "account_key", "container_name"},
+		"HTTP":          {"uri"},
+	}
 )
 
 func NewLogTargetResource() resource.Resource {
@@ -42,7 +66,7 @@ func (r *LogTargetResource) Metadata(ctx context.Context, req resource.MetadataR
 
 func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "CacheFly Log Target resource. Manages log target configurations for storing access and origin logs.",
+		MarkdownDescription: "CacheFly Log Target resource. Manages log target configurations for shipping access and origin logs.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -53,75 +77,171 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the log target.",
+				Description: "Name of the log target (minimum 2 characters).",
 				Optional:    true,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(2),
+				},
 			},
 			"type": schema.StringAttribute{
-				Description: "Type of log target ('S3_BUCKET' | 'ELASTICSEARCH' | 'GOOGLE_BUCKET').",
+				Description: "Type of log target ('S3_BUCKET' | 'GOOGLE_BUCKET' | 'AZURE_BLOB' | 'HTTP'). Changing this forces a new log target to be created.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("S3_BUCKET", "GOOGLE_BUCKET", "AZURE_BLOB", "HTTP"),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
-			"endpoint": schema.StringAttribute{
-				Description: "Endpoint URL for the log target (for S3 log targets).",
+
+			// Common log delivery options.
+			"format": schema.StringAttribute{
+				Description: "Format of the shipped logs ('JSON' | 'NDJSON'). Defaults to 'JSON'.",
 				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("JSON"),
+				Validators: []validator.String{
+					stringvalidator.OneOf("JSON", "NDJSON"),
+				},
+			},
+			"compression": schema.StringAttribute{
+				Description: "Compression of the shipped logs ('NONE' | 'GZIP' | 'ZSTD'). Defaults to 'NONE'.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("NONE"),
+				Validators: []validator.String{
+					stringvalidator.OneOf("NONE", "GZIP", "ZSTD"),
+				},
+			},
+			"sampling": schema.Int64Attribute{
+				Description: "Percentage of logs to ship (0-100). Defaults to 100.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(100),
+				Validators: []validator.Int64{
+					int64validator.Between(0, 100),
+				},
+			},
+
+			// S3_BUCKET fields.
+			"endpoint": schema.StringAttribute{
+				Description: "Endpoint URL (for S3 log targets).",
+				Optional:    true,
+				Computed:    true,
 			},
 			"region": schema.StringAttribute{
-				Description: "Region for the log target (for S3 log targets).",
+				Description: "Region (for S3 log targets).",
 				Optional:    true,
+				Computed:    true,
 			},
 			"bucket": schema.StringAttribute{
 				Description: "Bucket name (for S3 or Google Cloud log targets).",
 				Optional:    true,
+				Computed:    true,
 			},
 			"access_key": schema.StringAttribute{
 				Description: "Access key (for S3 log targets).",
 				Optional:    true,
+				Computed:    true,
 				Sensitive:   true,
 			},
 			"secret_key": schema.StringAttribute{
 				Description: "Secret key (for S3 log targets).",
 				Optional:    true,
+				Computed:    true,
 				Sensitive:   true,
 			},
 			"signature_version": schema.StringAttribute{
-				Description: "Signature version (for S3 log targets).",
+				Description: "Signature version (for S3 log targets), e.g. 'v4'.",
 				Optional:    true,
+				Computed:    true,
 			},
+
+			// GOOGLE_BUCKET fields.
 			"json_key": schema.StringAttribute{
-				Description: "JSON key (for Google Cloud log targets).",
+				Description: "Service account JSON key (for Google Cloud log targets).",
 				Optional:    true,
+				Computed:    true,
 				Sensitive:   true,
 			},
-			"hosts": schema.SetAttribute{
-				Description: "List of hosts (for Elasticsearch log targets).",
+
+			// AZURE_BLOB fields.
+			"endpoint_protocol": schema.StringAttribute{
+				Description: "Endpoint protocol ('HTTP' | 'HTTPS') for Azure Blob log targets. Defaults to 'HTTPS'.",
 				Optional:    true,
-				ElementType: types.StringType,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("HTTP", "HTTPS"),
+				},
 			},
-			"ssl": schema.BoolAttribute{
-				Description: "Whether to use SSL/TLS.",
+			"endpoint_suffix": schema.StringAttribute{
+				Description: "Endpoint suffix (for Azure Blob log targets).",
 				Optional:    true,
+				Computed:    true,
 			},
-			"ssl_certificate_verification": schema.BoolAttribute{
-				Description: "Whether to verify SSL certificates.",
+			"account_name": schema.StringAttribute{
+				Description: "Storage account name (for Azure Blob log targets).",
 				Optional:    true,
+				Computed:    true,
 			},
-			"index": schema.StringAttribute{
-				Description: "Index name (for Elasticsearch log targets).",
+			"account_key": schema.StringAttribute{
+				Description: "Storage account key (for Azure Blob log targets).",
 				Optional:    true,
+				Computed:    true,
+				Sensitive:   true,
 			},
-			"user": schema.StringAttribute{
-				Description: "Username for authentication.",
+			"container_name": schema.StringAttribute{
+				Description: "Blob container name (for Azure Blob log targets).",
 				Optional:    true,
+				Computed:    true,
+			},
+			"prefix": schema.StringAttribute{
+				Description: "Path prefix within the container (for Azure Blob log targets).",
+				Optional:    true,
+				Computed:    true,
+			},
+
+			// HTTP fields.
+			"uri": schema.StringAttribute{
+				Description: "URI logs are shipped to (for HTTP log targets).",
+				Optional:    true,
+				Computed:    true,
+			},
+			"method": schema.StringAttribute{
+				Description: "HTTP method ('POST' | 'PUT') for HTTP log targets. Defaults to 'POST'.",
+				Optional:    true,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("POST", "PUT"),
+				},
+			},
+			"auth": schema.StringAttribute{
+				Description: "Authentication scheme ('NONE' | 'BASIC' | 'BEARER') for HTTP log targets. Defaults to 'NONE'.",
+				Optional:    true,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("NONE", "BASIC", "BEARER"),
+				},
+			},
+			"username": schema.StringAttribute{
+				Description: "Username for BASIC authentication (for HTTP log targets).",
+				Optional:    true,
+				Computed:    true,
 			},
 			"password": schema.StringAttribute{
-				Description: "Password for authentication.",
+				Description: "Password for BASIC authentication (for HTTP log targets).",
 				Optional:    true,
+				Computed:    true,
 				Sensitive:   true,
 			},
-			"api_key": schema.StringAttribute{
-				Description: "API key for authentication.",
+			"token": schema.StringAttribute{
+				Description: "Token for BEARER authentication (for HTTP log targets).",
 				Optional:    true,
+				Computed:    true,
 				Sensitive:   true,
 			},
+
 			"access_logs_services": schema.SetAttribute{
 				Description: "List of service IDs to enable access logs for.",
 				Optional:    true,
@@ -145,6 +265,79 @@ func (r *LogTargetResource) Schema(ctx context.Context, req resource.SchemaReque
 				Computed:    true,
 			},
 		},
+	}
+}
+
+// ValidateConfig enforces the per-type field requirements of the log targets
+// API: each type has its own set of required fields, and fields belonging to
+// other types are rejected.
+func (r *LogTargetResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data models.LogTargetResourceModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if data.Type.IsNull() || data.Type.IsUnknown() {
+		return
+	}
+	targetType := data.Type.ValueString()
+
+	typeSpecific, ok := logTargetTypeSpecificFields[targetType]
+	if !ok {
+		// Unknown type values are reported by the schema validator.
+		return
+	}
+
+	configValues := map[string]attr.Value{
+		"endpoint":          data.Endpoint,
+		"region":            data.Region,
+		"bucket":            data.Bucket,
+		"access_key":        data.AccessKey,
+		"secret_key":        data.SecretKey,
+		"signature_version": data.SignatureVersion,
+		"json_key":          data.JsonKey,
+		"endpoint_protocol": data.EndpointProtocol,
+		"endpoint_suffix":   data.EndpointSuffix,
+		"account_name":      data.AccountName,
+		"account_key":       data.AccountKey,
+		"container_name":    data.ContainerName,
+		"prefix":            data.Prefix,
+		"uri":               data.Uri,
+		"method":            data.Method,
+		"auth":              data.Auth,
+		"username":          data.Username,
+		"password":          data.Password,
+		"token":             data.Token,
+	}
+
+	allowed := make(map[string]bool, len(typeSpecific))
+	for _, field := range typeSpecific {
+		allowed[field] = true
+	}
+
+	// Reject fields that belong to other log target types.
+	for field, value := range configValues {
+		if allowed[field] || value.IsNull() || value.IsUnknown() {
+			continue
+		}
+		resp.Diagnostics.AddAttributeError(
+			path.Root(field),
+			"Invalid Log Target Attribute",
+			fmt.Sprintf("Attribute %q cannot be set for log targets of type %q.", field, targetType),
+		)
+	}
+
+	// Require the fields the API mandates for the chosen type.
+	for _, field := range logTargetRequiredFields[targetType] {
+		if configValues[field].IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root(field),
+				"Missing Log Target Attribute",
+				fmt.Sprintf("Attribute %q is required for log targets of type %q.", field, targetType),
+			)
+		}
 	}
 }
 
@@ -178,58 +371,38 @@ func (r *LogTargetResource) Create(ctx context.Context, req resource.CreateReque
 		Type: data.Type.ValueString(),
 	}
 
-	// Optional fields
-	if !data.Name.IsUnknown() {
-		createReq.Name = data.Name.ValueStringPointer()
-	}
-	if !data.Endpoint.IsUnknown() {
-		createReq.Endpoint = data.Endpoint.ValueStringPointer()
-	}
-	if !data.Region.IsUnknown() {
-		createReq.Region = data.Region.ValueStringPointer()
-	}
-	if !data.Bucket.IsUnknown() {
-		createReq.Bucket = data.Bucket.ValueStringPointer()
-	}
-	if !data.AccessKey.IsUnknown() {
-		createReq.AccessKey = data.AccessKey.ValueStringPointer()
-	}
-	if !data.SecretKey.IsUnknown() {
-		createReq.SecretKey = data.SecretKey.ValueStringPointer()
-	}
-	if !data.SignatureVersion.IsUnknown() {
-		createReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
-	}
-	if !data.JsonKey.IsUnknown() {
-		createReq.JsonKey = data.JsonKey.ValueStringPointer()
-	}
-	if !data.SSL.IsUnknown() {
-		createReq.SSL = data.SSL.ValueBoolPointer()
-	}
-	if !data.SSLCertificateVerification.IsUnknown() {
-		createReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBoolPointer()
-	}
-	if !data.Index.IsUnknown() {
-		createReq.Index = data.Index.ValueStringPointer()
-	}
-	if !data.User.IsUnknown() {
-		createReq.User = data.User.ValueStringPointer()
-	}
-	if !data.Password.IsUnknown() {
-		createReq.Password = data.Password.ValueStringPointer()
-	}
-	if !data.ApiKey.IsUnknown() {
-		createReq.ApiKey = data.ApiKey.ValueStringPointer()
+	setString := func(value types.String, target **string) {
+		if !value.IsNull() && !value.IsUnknown() {
+			*target = value.ValueStringPointer()
+		}
 	}
 
-	// Handle hosts set
-	if !data.Hosts.IsNull() && !data.Hosts.IsUnknown() {
-		var hosts []string
-		resp.Diagnostics.Append(data.Hosts.ElementsAs(ctx, &hosts, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		createReq.Hosts = &hosts
+	setString(data.Name, &createReq.Name)
+	setString(data.Format, &createReq.Format)
+	setString(data.Compression, &createReq.Compression)
+	setString(data.Endpoint, &createReq.Endpoint)
+	setString(data.Region, &createReq.Region)
+	setString(data.Bucket, &createReq.Bucket)
+	setString(data.AccessKey, &createReq.AccessKey)
+	setString(data.SecretKey, &createReq.SecretKey)
+	setString(data.SignatureVersion, &createReq.SignatureVersion)
+	setString(data.JsonKey, &createReq.JsonKey)
+	setString(data.EndpointProtocol, &createReq.EndpointProtocol)
+	setString(data.EndpointSuffix, &createReq.EndpointSuffix)
+	setString(data.AccountName, &createReq.AccountName)
+	setString(data.AccountKey, &createReq.AccountKey)
+	setString(data.ContainerName, &createReq.ContainerName)
+	setString(data.Prefix, &createReq.Prefix)
+	setString(data.Uri, &createReq.Uri)
+	setString(data.Method, &createReq.Method)
+	setString(data.Auth, &createReq.Auth)
+	setString(data.Username, &createReq.Username)
+	setString(data.Password, &createReq.Password)
+	setString(data.Token, &createReq.Token)
+
+	if !data.Sampling.IsNull() && !data.Sampling.IsUnknown() {
+		sampling := int(data.Sampling.ValueInt64())
+		createReq.Sampling = &sampling
 	}
 
 	logTarget, err := r.client.LogTargets.Create(ctx, createReq)
@@ -320,62 +493,42 @@ func (r *LogTargetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Build update request with only changed fields
+	// Build update request with only changed fields. Type changes force a
+	// replacement, so type is never part of an update.
 	updateReq := api.UpdateLogTargetRequest{}
 
-	if !data.Name.Equal(state.Name) {
-		updateReq.Name = data.Name.ValueStringPointer()
-	}
-	if !data.Type.Equal(state.Type) {
-		updateReq.Type = data.Type.ValueStringPointer()
-	}
-	if !data.Endpoint.Equal(state.Endpoint) {
-		updateReq.Endpoint = data.Endpoint.ValueStringPointer()
-	}
-	if !data.Region.Equal(state.Region) {
-		updateReq.Region = data.Region.ValueStringPointer()
-	}
-	if !data.Bucket.Equal(state.Bucket) {
-		updateReq.Bucket = data.Bucket.ValueStringPointer()
-	}
-	if !data.AccessKey.Equal(state.AccessKey) {
-		updateReq.AccessKey = data.AccessKey.ValueStringPointer()
-	}
-	if !data.SecretKey.Equal(state.SecretKey) {
-		updateReq.SecretKey = data.SecretKey.ValueStringPointer()
-	}
-	if !data.SignatureVersion.Equal(state.SignatureVersion) {
-		updateReq.SignatureVersion = data.SignatureVersion.ValueStringPointer()
-	}
-	if !data.JsonKey.Equal(state.JsonKey) {
-		updateReq.JsonKey = data.JsonKey.ValueStringPointer()
-	}
-	if !data.SSL.Equal(state.SSL) {
-		updateReq.SSL = data.SSL.ValueBoolPointer()
-	}
-	if !data.SSLCertificateVerification.Equal(state.SSLCertificateVerification) {
-		updateReq.SSLCertificateVerification = data.SSLCertificateVerification.ValueBoolPointer()
-	}
-	if !data.Index.Equal(state.Index) {
-		updateReq.Index = data.Index.ValueStringPointer()
-	}
-	if !data.User.Equal(state.User) {
-		updateReq.User = data.User.ValueStringPointer()
-	}
-	if !data.Password.Equal(state.Password) {
-		updateReq.Password = data.Password.ValueStringPointer()
-	}
-	if !data.ApiKey.Equal(state.ApiKey) {
-		updateReq.ApiKey = data.ApiKey.ValueStringPointer()
+	setChangedString := func(planned, current types.String, target **string) {
+		if !planned.Equal(current) && !planned.IsUnknown() {
+			*target = planned.ValueStringPointer()
+		}
 	}
 
-	if !data.Hosts.Equal(state.Hosts) {
-		var hosts []string
-		resp.Diagnostics.Append(data.Hosts.ElementsAs(ctx, &hosts, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		updateReq.Hosts = &hosts
+	setChangedString(data.Name, state.Name, &updateReq.Name)
+	setChangedString(data.Format, state.Format, &updateReq.Format)
+	setChangedString(data.Compression, state.Compression, &updateReq.Compression)
+	setChangedString(data.Endpoint, state.Endpoint, &updateReq.Endpoint)
+	setChangedString(data.Region, state.Region, &updateReq.Region)
+	setChangedString(data.Bucket, state.Bucket, &updateReq.Bucket)
+	setChangedString(data.AccessKey, state.AccessKey, &updateReq.AccessKey)
+	setChangedString(data.SecretKey, state.SecretKey, &updateReq.SecretKey)
+	setChangedString(data.SignatureVersion, state.SignatureVersion, &updateReq.SignatureVersion)
+	setChangedString(data.JsonKey, state.JsonKey, &updateReq.JsonKey)
+	setChangedString(data.EndpointProtocol, state.EndpointProtocol, &updateReq.EndpointProtocol)
+	setChangedString(data.EndpointSuffix, state.EndpointSuffix, &updateReq.EndpointSuffix)
+	setChangedString(data.AccountName, state.AccountName, &updateReq.AccountName)
+	setChangedString(data.AccountKey, state.AccountKey, &updateReq.AccountKey)
+	setChangedString(data.ContainerName, state.ContainerName, &updateReq.ContainerName)
+	setChangedString(data.Prefix, state.Prefix, &updateReq.Prefix)
+	setChangedString(data.Uri, state.Uri, &updateReq.Uri)
+	setChangedString(data.Method, state.Method, &updateReq.Method)
+	setChangedString(data.Auth, state.Auth, &updateReq.Auth)
+	setChangedString(data.Username, state.Username, &updateReq.Username)
+	setChangedString(data.Password, state.Password, &updateReq.Password)
+	setChangedString(data.Token, state.Token, &updateReq.Token)
+
+	if !data.Sampling.Equal(state.Sampling) && !data.Sampling.IsNull() && !data.Sampling.IsUnknown() {
+		sampling := int(data.Sampling.ValueInt64())
+		updateReq.Sampling = &sampling
 	}
 
 	logTarget, err := r.client.LogTargets.UpdateByID(ctx, data.ID.ValueString(), updateReq)
@@ -480,59 +633,92 @@ func (r *LogTargetResource) ImportState(ctx context.Context, req resource.Import
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+// stringFromAPI returns the value reported by the API. When the API omits the
+// field (e.g. secrets that are not echoed back, or fields that do not apply
+// to the log target's type), the prior known value is preserved so that
+// apply results stay consistent with the plan.
+func stringFromAPI(apiValue *string, prior types.String) types.String {
+	if apiValue != nil {
+		return types.StringValue(*apiValue)
+	}
+	if prior.IsUnknown() {
+		return types.StringNull()
+	}
+	return prior
+}
+
+// int64FromAPI is the int equivalent of stringFromAPI.
+func int64FromAPI(apiValue *int, prior types.Int64) types.Int64 {
+	if apiValue != nil {
+		return types.Int64Value(int64(*apiValue))
+	}
+	if prior.IsUnknown() {
+		return types.Int64Null()
+	}
+	return prior
+}
+
+// servicesSetFromAPI converts a services list reported by the API to a set.
+// When the API does not report the list, the prior known value is preserved
+// (the current API does not document these lists in its responses).
+func servicesSetFromAPI(apiValue *[]string, prior types.Set) types.Set {
+	if apiValue != nil {
+		elements := make([]attr.Value, len(*apiValue))
+		for i, service := range *apiValue {
+			elements[i] = types.StringValue(service)
+		}
+		return types.SetValueMust(types.StringType, elements)
+	}
+	if prior.IsNull() || prior.IsUnknown() {
+		return types.SetValueMust(types.StringType, []attr.Value{})
+	}
+	return prior
+}
+
 // Helper function to map SDK LogTarget to Terraform state
 func (r *LogTargetResource) mapLogTargetToState(logTarget *api.LogTarget, data *models.LogTargetResourceModel) {
 	data.ID = types.StringValue(logTarget.ID)
-	data.Name = types.StringPointerValue(logTarget.Name)
 	data.Type = types.StringValue(logTarget.Type)
 	data.CreatedAt = types.StringValue(logTarget.CreatedAt)
 	data.UpdatedAt = types.StringValue(logTarget.UpdatedAt)
 
-	// Handle optional string fields
-	data.Endpoint = types.StringPointerValue(logTarget.Endpoint)
-	data.Region = types.StringPointerValue(logTarget.Region)
-	data.Bucket = types.StringPointerValue(logTarget.Bucket)
-	data.AccessKey = types.StringPointerValue(logTarget.AccessKey)
-	data.SecretKey = types.StringPointerValue(logTarget.SecretKey)
-	data.SignatureVersion = types.StringPointerValue(logTarget.SignatureVersion)
-	data.JsonKey = types.StringPointerValue(logTarget.JsonKey)
-	data.Index = types.StringPointerValue(logTarget.Index)
-	data.User = types.StringPointerValue(logTarget.User)
-	data.Password = types.StringPointerValue(logTarget.Password)
-	data.ApiKey = types.StringPointerValue(logTarget.ApiKey)
+	data.Name = stringFromAPI(logTarget.Name, data.Name)
 
-	// Handle boolean fields
-	data.SSL = types.BoolPointerValue(logTarget.SSL)
-	data.SSLCertificateVerification = types.BoolPointerValue(logTarget.SSLCertificateVerification)
+	// Common log delivery options.
+	data.Format = stringFromAPI(logTarget.Format, data.Format)
+	data.Compression = stringFromAPI(logTarget.Compression, data.Compression)
+	data.Sampling = int64FromAPI(logTarget.Sampling, data.Sampling)
 
-	// Handle hosts list
-	if logTarget.Hosts != nil && len(*logTarget.Hosts) > 0 {
-		hostElements := make([]attr.Value, len(*logTarget.Hosts))
-		for i, host := range *logTarget.Hosts {
-			hostElements[i] = types.StringValue(host)
-		}
-		data.Hosts = types.SetValueMust(types.StringType, hostElements)
-	}
+	// S3_BUCKET fields.
+	data.Endpoint = stringFromAPI(logTarget.Endpoint, data.Endpoint)
+	data.Region = stringFromAPI(logTarget.Region, data.Region)
+	data.Bucket = stringFromAPI(logTarget.Bucket, data.Bucket)
+	data.AccessKey = stringFromAPI(logTarget.AccessKey, data.AccessKey)
+	data.SecretKey = stringFromAPI(logTarget.SecretKey, data.SecretKey)
+	data.SignatureVersion = stringFromAPI(logTarget.SignatureVersion, data.SignatureVersion)
 
-	if logTarget.AccessLogsServices != nil && len(*logTarget.AccessLogsServices) > 0 {
-		accessLogsServicesElements := make([]attr.Value, len(*logTarget.AccessLogsServices))
-		for i, service := range *logTarget.AccessLogsServices {
-			accessLogsServicesElements[i] = types.StringValue(service)
-		}
-		data.AccessLogsServices = types.SetValueMust(types.StringType, accessLogsServicesElements)
-	} else {
-		data.AccessLogsServices = types.SetValueMust(types.StringType, []attr.Value{})
-	}
+	// GOOGLE_BUCKET fields.
+	data.JsonKey = stringFromAPI(logTarget.JsonKey, data.JsonKey)
 
-	if logTarget.OriginLogsServices != nil && len(*logTarget.OriginLogsServices) > 0 {
-		originLogsServicesElements := make([]attr.Value, len(*logTarget.OriginLogsServices))
-		for i, service := range *logTarget.OriginLogsServices {
-			originLogsServicesElements[i] = types.StringValue(service)
-		}
-		data.OriginLogsServices = types.SetValueMust(types.StringType, originLogsServicesElements)
-	} else {
-		data.OriginLogsServices = types.SetValueMust(types.StringType, []attr.Value{})
-	}
+	// AZURE_BLOB fields.
+	data.EndpointProtocol = stringFromAPI(logTarget.EndpointProtocol, data.EndpointProtocol)
+	data.EndpointSuffix = stringFromAPI(logTarget.EndpointSuffix, data.EndpointSuffix)
+	data.AccountName = stringFromAPI(logTarget.AccountName, data.AccountName)
+	data.AccountKey = stringFromAPI(logTarget.AccountKey, data.AccountKey)
+	data.ContainerName = stringFromAPI(logTarget.ContainerName, data.ContainerName)
+	data.Prefix = stringFromAPI(logTarget.Prefix, data.Prefix)
+
+	// HTTP fields.
+	data.Uri = stringFromAPI(logTarget.Uri, data.Uri)
+	data.Method = stringFromAPI(logTarget.Method, data.Method)
+	data.Auth = stringFromAPI(logTarget.Auth, data.Auth)
+	data.Username = stringFromAPI(logTarget.Username, data.Username)
+	data.Password = stringFromAPI(logTarget.Password, data.Password)
+	data.Token = stringFromAPI(logTarget.Token, data.Token)
+
+	// Services logging lists.
+	data.AccessLogsServices = servicesSetFromAPI(logTarget.AccessLogsServices, data.AccessLogsServices)
+	data.OriginLogsServices = servicesSetFromAPI(logTarget.OriginLogsServices, data.OriginLogsServices)
 }
 
 // slicesHaveEqualElements compares two string slices for equality

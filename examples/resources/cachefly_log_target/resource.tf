@@ -1,5 +1,5 @@
 # ===================================================================
-# CacheFly CDN - Log Target Setup Examples (S3, Elasticsearch, GCS)
+# CacheFly CDN - Log Target Setup Examples (S3, GCS, Azure Blob, HTTP)
 # ===================================================================
 
 terraform {
@@ -40,37 +40,57 @@ resource "cachefly_log_target" "s3_logs" {
   access_key = "AKIAIOSFODNN7EXAMPLE"
   secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
+  # Optional log delivery options (defaults shown)
+  format      = "JSON"
+  compression = "NONE"
+  sampling    = 100
+
   # Enable logs for selected services
   access_logs_services = [cachefly_service.example.id]
   origin_logs_services = [cachefly_service.example.id]
-
-  depends_on = [cachefly_service.example]
 }
 
 # -------------------------------------------------------------------
-# Example 3: Elasticsearch Log Target
+# Example 3: HTTP Log Target
 # -------------------------------------------------------------------
-resource "cachefly_log_target" "elasticsearch_logs" {
-  name                         = "example-dev-es-logs"
-  type                         = "ELASTICSEARCH"
-  hosts                        = [
-    "elasticsearch1.example.com:9200",
-    "elasticsearch2.example.com:9200",
-  ]
-  ssl                          = true
-  ssl_certificate_verification = true
-  index                        = "cachefly-logs"
-  user                         = "elastic"
-  password                     = "replace-with-real-password"
+resource "cachefly_log_target" "http_logs" {
+  name   = "example-dev-http-logs"
+  type   = "HTTP"
+  uri    = "https://logs.example.com/ingest"
+  method = "POST"
+
+  # Authentication: 'NONE' (default), 'BASIC' (username/password) or
+  # 'BEARER' (token)
+  auth     = "BASIC"
+  username = "loguser"
+  password = "replace-with-real-password"
+
+  format      = "NDJSON"
+  compression = "GZIP"
 
   access_logs_services = [cachefly_service.example.id]
   origin_logs_services = [cachefly_service.example.id]
-
-  depends_on = [cachefly_service.example]
 }
 
 # -------------------------------------------------------------------
-# Example 4: Google Cloud Storage Log Target (uncomment to use)
+# Example 4: Azure Blob Storage Log Target
+# -------------------------------------------------------------------
+resource "cachefly_log_target" "azure_logs" {
+  name           = "example-dev-azure-logs"
+  type           = "AZURE_BLOB"
+  account_name   = "mystorageaccount"
+  account_key    = "replace-with-real-account-key"
+  container_name = "cachefly-logs"
+
+  # Optional
+  prefix            = "cdn/"
+  endpoint_protocol = "HTTPS"
+
+  access_logs_services = [cachefly_service.example.id]
+}
+
+# -------------------------------------------------------------------
+# Example 5: Google Cloud Storage Log Target (uncomment to use)
 # -------------------------------------------------------------------
 # resource "cachefly_log_target" "gcs_logs" {
 #   name     = "example-dev-gcs-logs"
@@ -96,24 +116,28 @@ resource "cachefly_log_target" "elasticsearch_logs" {
 output "log_targets" {
   value = {
     s3 = {
-      id        = cachefly_log_target.s3_logs.id
-      name      = cachefly_log_target.s3_logs.name
-      type      = cachefly_log_target.s3_logs.type
-      created   = cachefly_log_target.s3_logs.created_at
-      updated   = cachefly_log_target.s3_logs.updated_at
-      services  = {
+      id      = cachefly_log_target.s3_logs.id
+      name    = cachefly_log_target.s3_logs.name
+      type    = cachefly_log_target.s3_logs.type
+      created = cachefly_log_target.s3_logs.created_at
+      updated = cachefly_log_target.s3_logs.updated_at
+      services = {
         access = cachefly_log_target.s3_logs.access_logs_services
         origin = cachefly_log_target.s3_logs.origin_logs_services
       }
     }
-    elasticsearch = {
-      id      = cachefly_log_target.elasticsearch_logs.id
-      name    = cachefly_log_target.elasticsearch_logs.name
-      type    = cachefly_log_target.elasticsearch_logs.type
-      hosts   = cachefly_log_target.elasticsearch_logs.hosts
-      index   = cachefly_log_target.elasticsearch_logs.index
-      created = cachefly_log_target.elasticsearch_logs.created_at
-      updated = cachefly_log_target.elasticsearch_logs.updated_at
+    http = {
+      id     = cachefly_log_target.http_logs.id
+      name   = cachefly_log_target.http_logs.name
+      type   = cachefly_log_target.http_logs.type
+      uri    = cachefly_log_target.http_logs.uri
+      method = cachefly_log_target.http_logs.method
+    }
+    azure = {
+      id        = cachefly_log_target.azure_logs.id
+      name      = cachefly_log_target.azure_logs.name
+      type      = cachefly_log_target.azure_logs.type
+      container = cachefly_log_target.azure_logs.container_name
     }
   }
 }

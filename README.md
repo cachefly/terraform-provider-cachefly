@@ -95,7 +95,7 @@ Explore examples in this repository:
 - **SSL certificates**: Upload and manage custom TLS/SSL certs
 - **Script configs**: Manage reusable script configurations and activation
 - **Users**: Create/manage users, permissions, and service assignments
-- **Log targets**: Configure S3/Elasticsearch/Google Bucket logging targets
+- **Log targets**: Configure S3, Google Cloud, Azure Blob, and HTTP logging targets
 - **Data sources**: Query services, domains, origins, users, log targets, delivery regions
 
 ## Resources and Data Sources

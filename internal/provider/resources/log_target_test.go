@@ -34,21 +34,39 @@ func TestLogTargetResourceSchema(t *testing.T) {
 	assert.Contains(t, attrs, "name")
 	assert.Contains(t, attrs, "type")
 
-	// optional attributes exist
+	// common log delivery options exist
+	assert.Contains(t, attrs, "format")
+	assert.Contains(t, attrs, "compression")
+	assert.Contains(t, attrs, "sampling")
+
+	// S3_BUCKET attributes exist
 	assert.Contains(t, attrs, "endpoint")
 	assert.Contains(t, attrs, "region")
 	assert.Contains(t, attrs, "bucket")
 	assert.Contains(t, attrs, "access_key")
 	assert.Contains(t, attrs, "secret_key")
 	assert.Contains(t, attrs, "signature_version")
+
+	// GOOGLE_BUCKET attributes exist
 	assert.Contains(t, attrs, "json_key")
-	assert.Contains(t, attrs, "hosts")
-	assert.Contains(t, attrs, "ssl")
-	assert.Contains(t, attrs, "ssl_certificate_verification")
-	assert.Contains(t, attrs, "index")
-	assert.Contains(t, attrs, "user")
+
+	// AZURE_BLOB attributes exist
+	assert.Contains(t, attrs, "endpoint_protocol")
+	assert.Contains(t, attrs, "endpoint_suffix")
+	assert.Contains(t, attrs, "account_name")
+	assert.Contains(t, attrs, "account_key")
+	assert.Contains(t, attrs, "container_name")
+	assert.Contains(t, attrs, "prefix")
+
+	// HTTP attributes exist
+	assert.Contains(t, attrs, "uri")
+	assert.Contains(t, attrs, "method")
+	assert.Contains(t, attrs, "auth")
+	assert.Contains(t, attrs, "username")
 	assert.Contains(t, attrs, "password")
-	assert.Contains(t, attrs, "api_key")
+	assert.Contains(t, attrs, "token")
+
+	// services logging attributes exist
 	assert.Contains(t, attrs, "access_logs_services")
 	assert.Contains(t, attrs, "origin_logs_services")
 
@@ -56,12 +74,21 @@ func TestLogTargetResourceSchema(t *testing.T) {
 	assert.Contains(t, attrs, "created_at")
 	assert.Contains(t, attrs, "updated_at")
 
+	// removed Elasticsearch-era attributes are gone
+	assert.NotContains(t, attrs, "hosts")
+	assert.NotContains(t, attrs, "ssl")
+	assert.NotContains(t, attrs, "ssl_certificate_verification")
+	assert.NotContains(t, attrs, "index")
+	assert.NotContains(t, attrs, "user")
+	assert.NotContains(t, attrs, "api_key")
+
 	// Verify sensitive attributes are marked as sensitive
 	assert.True(t, attrs["access_key"].IsSensitive(), "access_key should be marked as sensitive")
 	assert.True(t, attrs["secret_key"].IsSensitive(), "secret_key should be marked as sensitive")
 	assert.True(t, attrs["json_key"].IsSensitive(), "json_key should be marked as sensitive")
+	assert.True(t, attrs["account_key"].IsSensitive(), "account_key should be marked as sensitive")
 	assert.True(t, attrs["password"].IsSensitive(), "password should be marked as sensitive")
-	assert.True(t, attrs["api_key"].IsSensitive(), "api_key should be marked as sensitive")
+	assert.True(t, attrs["token"].IsSensitive(), "token should be marked as sensitive")
 }
 
 // Test Resource metadata
@@ -119,6 +146,9 @@ func TestAccLogTargetResourceS3(t *testing.T) {
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "bucket", "my-log-bucket"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "region", "us-east-1"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "signature_version", "v4"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "format", "JSON"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "compression", "NONE"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "sampling", "100"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "access_logs_services.#", "1"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "origin_logs_services.#", "1"),
 					resource.TestCheckResourceAttrPair("cachefly_log_target."+rName, "access_logs_services.0", "cachefly_service."+rName, "id"),
@@ -147,6 +177,8 @@ func TestAccLogTargetResourceS3(t *testing.T) {
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "S3_BUCKET"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "bucket", "my-log-bucket-updated"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "region", "us-west-2"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "compression", "GZIP"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "sampling", "50"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "access_logs_services.#", "0"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "origin_logs_services.#", "0"),
 				),
@@ -155,28 +187,27 @@ func TestAccLogTargetResourceS3(t *testing.T) {
 	})
 }
 
-func TestAccLogTargetResourceElasticsearch(t *testing.T) {
-	rName := "test-es-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+func TestAccLogTargetResourceHTTP(t *testing.T) {
+	rName := "test-http-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { provider.TestAccPreCheck(t) },
 		ProtoV6ProviderFactories: provider.TestAccProtoV6ProviderFactories,
 		CheckDestroy:             checkLogTargetDestroy,
 		Steps: []resource.TestStep{
-			// Create Elasticsearch log target
+			// Create HTTP log target
 			{
-				Config: testAccLogTargetResourceConfigElasticsearch(rName),
+				Config: testAccLogTargetResourceConfigHTTP(rName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckLogTargetExists("cachefly_log_target."+rName),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "ELASTICSEARCH"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.#", "2"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.0", "elasticsearch1.example.com:9200"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.1", "elasticsearch2.example.com:9200"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "ssl", "true"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "ssl_certificate_verification", "true"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "index", "cachefly-logs"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "user", "elastic"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "HTTP"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "uri", "https://logs.example.com/ingest"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "method", "POST"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "auth", "BASIC"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "username", "loguser"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "format", "NDJSON"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "compression", "GZIP"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "access_logs_services.#", "1"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "origin_logs_services.#", "1"),
 					resource.TestCheckResourceAttrPair("cachefly_log_target."+rName, "access_logs_services.0", "cachefly_service."+rName, "id"),
@@ -184,7 +215,7 @@ func TestAccLogTargetResourceElasticsearch(t *testing.T) {
 					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "id"),
 				),
 			},
-			// ImportState testing for Elasticsearch log target
+			// ImportState testing for HTTP log target
 			{
 				ResourceName:      "cachefly_log_target." + rName,
 				ImportState:       true,
@@ -194,21 +225,66 @@ func TestAccLogTargetResourceElasticsearch(t *testing.T) {
 					"password",
 				},
 			},
-			// Update testing for Elasticsearch log target
+			// Update testing for HTTP log target
 			{
-				Config: testAccLogTargetResourceConfigElasticsearchUpdated(rName),
+				Config: testAccLogTargetResourceConfigHTTPUpdated(rName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckLogTargetExists("cachefly_log_target."+rName),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName+"-updated"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "ELASTICSEARCH"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.#", "2"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.0", "elasticsearch3.example.com:9200"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "hosts.1", "elasticsearch4.example.com:9200"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "ssl", "false"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "ssl_certificate_verification", "false"),
-					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "index", "cachefly-logs-updated"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "HTTP"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "uri", "https://logs-updated.example.com/ingest"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "method", "PUT"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "auth", "BEARER"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "access_logs_services.#", "0"),
 					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "origin_logs_services.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccLogTargetResourceAzureBlob(t *testing.T) {
+	rName := "test-azure-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { provider.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: provider.TestAccProtoV6ProviderFactories,
+		CheckDestroy:             checkLogTargetDestroy,
+		Steps: []resource.TestStep{
+			// Create Azure Blob log target
+			{
+				Config: testAccLogTargetResourceConfigAzureBlob(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckLogTargetExists("cachefly_log_target."+rName),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "AZURE_BLOB"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "account_name", "mystorageaccount"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "container_name", "cachefly-logs"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "prefix", "cdn/"),
+					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "id"),
+					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "created_at"),
+					resource.TestCheckResourceAttrSet("cachefly_log_target."+rName, "updated_at"),
+				),
+			},
+			// ImportState testing for Azure Blob log target
+			{
+				ResourceName:      "cachefly_log_target." + rName,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					// Account key is sensitive and won't be returned in read operations
+					"account_key",
+				},
+			},
+			// Update testing for Azure Blob log target
+			{
+				Config: testAccLogTargetResourceConfigAzureBlobUpdated(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckLogTargetExists("cachefly_log_target."+rName),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "name", rName+"-updated"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "type", "AZURE_BLOB"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "container_name", "cachefly-logs-updated"),
+					resource.TestCheckResourceAttr("cachefly_log_target."+rName, "prefix", "cdn-updated/"),
 				),
 			},
 		},
@@ -313,36 +389,6 @@ func checkLogTargetDestroy(s *terraform.State) error {
 	return nil
 }
 
-// Test configuration for basic syslog log target
-func testAccLogTargetResourceConfig(name string) string {
-	return fmt.Sprintf(`
-provider "cachefly" {}
-
-resource "cachefly_log_target" %[1]q {
-  name                           = %[1]q
-  type                           = "SYSLOG"
-  endpoint                       = "syslog.example.com:514"
-  ssl                            = false
-  ssl_certificate_verification   = true
-}
-`, name)
-}
-
-// Test configuration for updated syslog log target
-func testAccLogTargetResourceConfigUpdated(name string) string {
-	return fmt.Sprintf(`
-provider "cachefly" {}
-
-resource "cachefly_log_target" %[1]q {
-  name                           = "%[1]s-updated"
-  type                           = "SYSLOG"
-  endpoint                       = "updated-syslog.example.com:514"
-  ssl                            = true
-  ssl_certificate_verification   = false
-}
-`, name)
-}
-
 // Test configuration for S3 log target
 func testAccLogTargetResourceConfigS3(name string) string {
 	return fmt.Sprintf(`
@@ -389,6 +435,8 @@ resource "cachefly_log_target" %[1]q {
   access_key         = "AKIAIOSFODNN7EXAMPLE"
   secret_key         = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
   signature_version  = "v4"
+  compression        = "GZIP"
+  sampling           = 50
   access_logs_services = []
   origin_logs_services = []
 
@@ -397,8 +445,8 @@ resource "cachefly_log_target" %[1]q {
 `, name)
 }
 
-// Test configuration for Elasticsearch log target
-func testAccLogTargetResourceConfigElasticsearch(name string) string {
+// Test configuration for HTTP log target
+func testAccLogTargetResourceConfigHTTP(name string) string {
 	return fmt.Sprintf(`
 provider "cachefly" {}
 
@@ -409,27 +457,25 @@ resource "cachefly_service" %[1]q {
 }
 
 resource "cachefly_log_target" %[1]q {
-  name                           = %[1]q
-  type                           = "ELASTICSEARCH"
-  hosts                          = [
-    "elasticsearch1.example.com:9200",
-    "elasticsearch2.example.com:9200"
-  ]
-  ssl                            = true
-  ssl_certificate_verification   = true
-  index                          = "cachefly-logs"
-  user                           = "elastic"
-  password                       = "secret-password"
-  access_logs_services           = [cachefly_service.%[1]s.id]
-  origin_logs_services           = [cachefly_service.%[1]s.id]
+  name        = %[1]q
+  type        = "HTTP"
+  uri         = "https://logs.example.com/ingest"
+  method      = "POST"
+  auth        = "BASIC"
+  username    = "loguser"
+  password    = "secret-password"
+  format      = "NDJSON"
+  compression = "GZIP"
+  access_logs_services = [cachefly_service.%[1]s.id]
+  origin_logs_services = [cachefly_service.%[1]s.id]
 
   depends_on = [cachefly_service.%[1]s]
 }
 `, name)
 }
 
-// Test configuration for UPDATED Elasticsearch log target
-func testAccLogTargetResourceConfigElasticsearchUpdated(name string) string {
+// Test configuration for UPDATED HTTP log target
+func testAccLogTargetResourceConfigHTTPUpdated(name string) string {
 	return fmt.Sprintf(`
 provider "cachefly" {}
 
@@ -440,21 +486,50 @@ resource "cachefly_service" %[1]q {
 }
 
 resource "cachefly_log_target" %[1]q {
-  name                           = "%[1]s-updated"
-  type                           = "ELASTICSEARCH"
-  hosts                          = [
-    "elasticsearch3.example.com:9200",
-    "elasticsearch4.example.com:9200"
-  ]
-  ssl                            = false
-  ssl_certificate_verification   = false
-  index                          = "cachefly-logs-updated"
-  user                           = "elastic"
-  password                       = "secret-password"
-  access_logs_services           = []
-  origin_logs_services           = []
+  name        = "%[1]s-updated"
+  type        = "HTTP"
+  uri         = "https://logs-updated.example.com/ingest"
+  method      = "PUT"
+  auth        = "BEARER"
+  token       = "secret-token"
+  format      = "NDJSON"
+  compression = "GZIP"
+  access_logs_services = []
+  origin_logs_services = []
 
   depends_on = [cachefly_service.%[1]s]
+}
+`, name)
+}
+
+// Test configuration for Azure Blob log target
+func testAccLogTargetResourceConfigAzureBlob(name string) string {
+	return fmt.Sprintf(`
+provider "cachefly" {}
+
+resource "cachefly_log_target" %[1]q {
+  name           = %[1]q
+  type           = "AZURE_BLOB"
+  account_name   = "mystorageaccount"
+  account_key    = "bXktYWNjb3VudC1rZXktZXhhbXBsZQ=="
+  container_name = "cachefly-logs"
+  prefix         = "cdn/"
+}
+`, name)
+}
+
+// Test configuration for UPDATED Azure Blob log target
+func testAccLogTargetResourceConfigAzureBlobUpdated(name string) string {
+	return fmt.Sprintf(`
+provider "cachefly" {}
+
+resource "cachefly_log_target" %[1]q {
+  name           = "%[1]s-updated"
+  type           = "AZURE_BLOB"
+  account_name   = "mystorageaccount"
+  account_key    = "bXktYWNjb3VudC1rZXktZXhhbXBsZQ=="
+  container_name = "cachefly-logs-updated"
+  prefix         = "cdn-updated/"
 }
 `, name)
 }

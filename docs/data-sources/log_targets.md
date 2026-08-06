@@ -20,7 +20,7 @@ CacheFly Log Targets data source. List log targets for access and origin logs.
 - `limit` (Number) Limit for pagination (default: API default).
 - `offset` (Number) Offset for pagination (default: 0).
 - `response_type` (String) Optional response type parameter for the API call.
-- `type` (String) Filter log targets by type ('S3_BUCKET' | 'ELASTICSEARCH' | 'GOOGLE_BUCKET').
+- `type` (String) Filter log targets by type ('S3_BUCKET' | 'GOOGLE_BUCKET' | 'AZURE_BLOB' | 'HTTP').
 
 ### Read-Only
 
@@ -32,23 +32,31 @@ CacheFly Log Targets data source. List log targets for access and origin logs.
 Read-Only:
 
 - `access_key` (String, Sensitive) Access key (for S3 log targets).
-- `access_logs_services` (Set of String) List of service IDs to enable access logs for.
-- `api_key` (String, Sensitive) API key for authentication.
+- `access_logs_services` (Set of String) List of service IDs with access logs enabled (when reported by the API).
+- `account_key` (String, Sensitive) Storage account key (for Azure Blob log targets).
+- `account_name` (String) Storage account name (for Azure Blob log targets).
+- `auth` (String) Authentication scheme ('NONE' | 'BASIC' | 'BEARER') for HTTP log targets.
 - `bucket` (String) Bucket name (for S3 or Google Cloud log targets).
+- `compression` (String) Compression of the shipped logs ('NONE' | 'GZIP' | 'ZSTD').
+- `container_name` (String) Blob container name (for Azure Blob log targets).
 - `created_at` (String) When the log target was created.
-- `endpoint` (String) Endpoint URL for the log target (for S3 log targets).
-- `hosts` (Set of String) List of hosts (for Elasticsearch log targets).
+- `endpoint` (String) Endpoint URL (for S3 log targets).
+- `endpoint_protocol` (String) Endpoint protocol ('HTTP' | 'HTTPS') for Azure Blob log targets.
+- `endpoint_suffix` (String) Endpoint suffix (for Azure Blob log targets).
+- `format` (String) Format of the shipped logs ('JSON' | 'NDJSON').
 - `id` (String) The unique identifier of the log target.
-- `index` (String) Index name (for Elasticsearch log targets).
-- `json_key` (String, Sensitive) JSON key (for Google Cloud log targets).
+- `json_key` (String, Sensitive) Service account JSON key (for Google Cloud log targets).
+- `method` (String) HTTP method ('POST' | 'PUT') for HTTP log targets.
 - `name` (String) Name of the log target.
-- `origin_logs_services` (Set of String) List of service IDs to enable origin logs for.
-- `password` (String, Sensitive) Password for authentication.
-- `region` (String) Region for the log target (for S3 log targets).
+- `origin_logs_services` (Set of String) List of service IDs with origin logs enabled (when reported by the API).
+- `password` (String, Sensitive) Password for BASIC authentication (for HTTP log targets).
+- `prefix` (String) Path prefix within the container (for Azure Blob log targets).
+- `region` (String) Region (for S3 log targets).
+- `sampling` (Number) Percentage of logs to ship (0-100).
 - `secret_key` (String, Sensitive) Secret key (for S3 log targets).
 - `signature_version` (String) Signature version (for S3 log targets).
-- `ssl` (Boolean) Whether to use SSL/TLS.
-- `ssl_certificate_verification` (Boolean) Whether to verify SSL certificates.
-- `type` (String) Type of log target.
+- `token` (String, Sensitive) Token for BEARER authentication (for HTTP log targets).
+- `type` (String) Type of log target ('S3_BUCKET' | 'GOOGLE_BUCKET' | 'AZURE_BLOB' | 'HTTP' | 'MANUAL').
 - `updated_at` (String) When the log target was last updated.
-- `user` (String) Username for authentication.
+- `uri` (String) URI logs are shipped to (for HTTP log targets).
+- `username` (String) Username for BASIC authentication (for HTTP log targets).

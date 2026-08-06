@@ -39,7 +39,7 @@ func (d *LogTargetsDataSource) Schema(ctx context.Context, req datasource.Schema
 
 		Attributes: map[string]schema.Attribute{
 			"type": schema.StringAttribute{
-				Description: "Filter log targets by type ('S3_BUCKET' | 'ELASTICSEARCH' | 'GOOGLE_BUCKET').",
+				Description: "Filter log targets by type ('S3_BUCKET' | 'GOOGLE_BUCKET' | 'AZURE_BLOB' | 'HTTP').",
 				Optional:    true,
 			},
 			"offset": schema.Int64Attribute{
@@ -68,15 +68,27 @@ func (d *LogTargetsDataSource) Schema(ctx context.Context, req datasource.Schema
 							Computed:    true,
 						},
 						"type": schema.StringAttribute{
-							Description: "Type of log target.",
+							Description: "Type of log target ('S3_BUCKET' | 'GOOGLE_BUCKET' | 'AZURE_BLOB' | 'HTTP' | 'MANUAL').",
+							Computed:    true,
+						},
+						"format": schema.StringAttribute{
+							Description: "Format of the shipped logs ('JSON' | 'NDJSON').",
+							Computed:    true,
+						},
+						"compression": schema.StringAttribute{
+							Description: "Compression of the shipped logs ('NONE' | 'GZIP' | 'ZSTD').",
+							Computed:    true,
+						},
+						"sampling": schema.Int64Attribute{
+							Description: "Percentage of logs to ship (0-100).",
 							Computed:    true,
 						},
 						"endpoint": schema.StringAttribute{
-							Description: "Endpoint URL for the log target (for S3 log targets).",
+							Description: "Endpoint URL (for S3 log targets).",
 							Computed:    true,
 						},
 						"region": schema.StringAttribute{
-							Description: "Region for the log target (for S3 log targets).",
+							Description: "Region (for S3 log targets).",
 							Computed:    true,
 						},
 						"bucket": schema.StringAttribute{
@@ -98,48 +110,68 @@ func (d *LogTargetsDataSource) Schema(ctx context.Context, req datasource.Schema
 							Computed:    true,
 						},
 						"json_key": schema.StringAttribute{
-							Description: "JSON key (for Google Cloud log targets).",
+							Description: "Service account JSON key (for Google Cloud log targets).",
 							Computed:    true,
 							Sensitive:   true,
 						},
-						"hosts": schema.SetAttribute{
-							Description: "List of hosts (for Elasticsearch log targets).",
-							Computed:    true,
-							ElementType: types.StringType,
-						},
-						"ssl": schema.BoolAttribute{
-							Description: "Whether to use SSL/TLS.",
+						"endpoint_protocol": schema.StringAttribute{
+							Description: "Endpoint protocol ('HTTP' | 'HTTPS') for Azure Blob log targets.",
 							Computed:    true,
 						},
-						"ssl_certificate_verification": schema.BoolAttribute{
-							Description: "Whether to verify SSL certificates.",
+						"endpoint_suffix": schema.StringAttribute{
+							Description: "Endpoint suffix (for Azure Blob log targets).",
 							Computed:    true,
 						},
-						"index": schema.StringAttribute{
-							Description: "Index name (for Elasticsearch log targets).",
+						"account_name": schema.StringAttribute{
+							Description: "Storage account name (for Azure Blob log targets).",
 							Computed:    true,
 						},
-						"user": schema.StringAttribute{
-							Description: "Username for authentication.",
+						"account_key": schema.StringAttribute{
+							Description: "Storage account key (for Azure Blob log targets).",
+							Computed:    true,
+							Sensitive:   true,
+						},
+						"container_name": schema.StringAttribute{
+							Description: "Blob container name (for Azure Blob log targets).",
+							Computed:    true,
+						},
+						"prefix": schema.StringAttribute{
+							Description: "Path prefix within the container (for Azure Blob log targets).",
+							Computed:    true,
+						},
+						"uri": schema.StringAttribute{
+							Description: "URI logs are shipped to (for HTTP log targets).",
+							Computed:    true,
+						},
+						"method": schema.StringAttribute{
+							Description: "HTTP method ('POST' | 'PUT') for HTTP log targets.",
+							Computed:    true,
+						},
+						"auth": schema.StringAttribute{
+							Description: "Authentication scheme ('NONE' | 'BASIC' | 'BEARER') for HTTP log targets.",
+							Computed:    true,
+						},
+						"username": schema.StringAttribute{
+							Description: "Username for BASIC authentication (for HTTP log targets).",
 							Computed:    true,
 						},
 						"password": schema.StringAttribute{
-							Description: "Password for authentication.",
+							Description: "Password for BASIC authentication (for HTTP log targets).",
 							Computed:    true,
 							Sensitive:   true,
 						},
-						"api_key": schema.StringAttribute{
-							Description: "API key for authentication.",
+						"token": schema.StringAttribute{
+							Description: "Token for BEARER authentication (for HTTP log targets).",
 							Computed:    true,
 							Sensitive:   true,
 						},
 						"access_logs_services": schema.SetAttribute{
-							Description: "List of service IDs to enable access logs for.",
+							Description: "List of service IDs with access logs enabled (when reported by the API).",
 							Computed:    true,
 							ElementType: types.StringType,
 						},
 						"origin_logs_services": schema.SetAttribute{
-							Description: "List of service IDs to enable origin logs for.",
+							Description: "List of service IDs with origin logs enabled (when reported by the API).",
 							Computed:    true,
 							ElementType: types.StringType,
 						},
@@ -228,92 +260,84 @@ func (d *LogTargetsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 	// Prepare attribute type map for each object in the list
 	objectAttrTypes := map[string]attr.Type{
-		"id":                           types.StringType,
-		"name":                         types.StringType,
-		"type":                         types.StringType,
-		"endpoint":                     types.StringType,
-		"region":                       types.StringType,
-		"bucket":                       types.StringType,
-		"access_key":                   types.StringType,
-		"secret_key":                   types.StringType,
-		"signature_version":            types.StringType,
-		"json_key":                     types.StringType,
-		"hosts":                        types.SetType{ElemType: types.StringType},
-		"ssl":                          types.BoolType,
-		"ssl_certificate_verification": types.BoolType,
-		"index":                        types.StringType,
-		"user":                         types.StringType,
-		"password":                     types.StringType,
-		"api_key":                      types.StringType,
-		"access_logs_services":         types.SetType{ElemType: types.StringType},
-		"origin_logs_services":         types.SetType{ElemType: types.StringType},
-		"created_at":                   types.StringType,
-		"updated_at":                   types.StringType,
+		"id":                   types.StringType,
+		"name":                 types.StringType,
+		"type":                 types.StringType,
+		"format":               types.StringType,
+		"compression":          types.StringType,
+		"sampling":             types.Int64Type,
+		"endpoint":             types.StringType,
+		"region":               types.StringType,
+		"bucket":               types.StringType,
+		"access_key":           types.StringType,
+		"secret_key":           types.StringType,
+		"signature_version":    types.StringType,
+		"json_key":             types.StringType,
+		"endpoint_protocol":    types.StringType,
+		"endpoint_suffix":      types.StringType,
+		"account_name":         types.StringType,
+		"account_key":          types.StringType,
+		"container_name":       types.StringType,
+		"prefix":               types.StringType,
+		"uri":                  types.StringType,
+		"method":               types.StringType,
+		"auth":                 types.StringType,
+		"username":             types.StringType,
+		"password":             types.StringType,
+		"token":                types.StringType,
+		"access_logs_services": types.SetType{ElemType: types.StringType},
+		"origin_logs_services": types.SetType{ElemType: types.StringType},
+		"created_at":           types.StringType,
+		"updated_at":           types.StringType,
 	}
 
 	// Map response to Terraform values
 	items := make([]attr.Value, len(allLogTargets))
 	for i, lt := range allLogTargets {
-		// Convert hosts slice pointer to set
-		var hostsSet types.Set
-		if lt.Hosts != nil && len(*lt.Hosts) > 0 {
-			hostElements := make([]attr.Value, len(*lt.Hosts))
-			for j, host := range *lt.Hosts {
-				hostElements[j] = types.StringValue(host)
-			}
-			hostsSet, _ = types.SetValue(types.StringType, hostElements)
+		// Convert sampling to Int64
+		var samplingValue types.Int64
+		if lt.Sampling != nil {
+			samplingValue = types.Int64Value(int64(*lt.Sampling))
 		} else {
-			hostsSet = types.SetNull(types.StringType)
+			samplingValue = types.Int64Null()
 		}
 
-		// Convert access logs services
-		var accessLogsSet types.Set
-		if lt.AccessLogsServices != nil && len(*lt.AccessLogsServices) > 0 {
-			elems := make([]attr.Value, len(*lt.AccessLogsServices))
-			for j, svc := range *lt.AccessLogsServices {
-				elems[j] = types.StringValue(svc)
-			}
-			accessLogsSet, _ = types.SetValue(types.StringType, elems)
-		} else {
-			accessLogsSet = types.SetNull(types.StringType)
-		}
-
-		// Convert origin logs services
-		var originLogsSet types.Set
-		if lt.OriginLogsServices != nil && len(*lt.OriginLogsServices) > 0 {
-			elems := make([]attr.Value, len(*lt.OriginLogsServices))
-			for j, svc := range *lt.OriginLogsServices {
-				elems[j] = types.StringValue(svc)
-			}
-			originLogsSet, _ = types.SetValue(types.StringType, elems)
-		} else {
-			originLogsSet = types.SetNull(types.StringType)
-		}
+		// Convert services lists (null when the API does not report them)
+		accessLogsSet := servicesSetOrNull(lt.AccessLogsServices)
+		originLogsSet := servicesSetOrNull(lt.OriginLogsServices)
 
 		obj, _ := types.ObjectValue(
 			objectAttrTypes,
 			map[string]attr.Value{
-				"id":                           types.StringValue(lt.ID),
-				"name":                         types.StringPointerValue(lt.Name),
-				"type":                         types.StringValue(lt.Type),
-				"endpoint":                     types.StringPointerValue(lt.Endpoint),
-				"region":                       types.StringPointerValue(lt.Region),
-				"bucket":                       types.StringPointerValue(lt.Bucket),
-				"access_key":                   types.StringPointerValue(lt.AccessKey),
-				"secret_key":                   types.StringPointerValue(lt.SecretKey),
-				"signature_version":            types.StringPointerValue(lt.SignatureVersion),
-				"json_key":                     types.StringPointerValue(lt.JsonKey),
-				"hosts":                        hostsSet,
-				"ssl":                          types.BoolPointerValue(lt.SSL),
-				"ssl_certificate_verification": types.BoolPointerValue(lt.SSLCertificateVerification),
-				"index":                        types.StringPointerValue(lt.Index),
-				"user":                         types.StringPointerValue(lt.User),
-				"password":                     types.StringPointerValue(lt.Password),
-				"api_key":                      types.StringPointerValue(lt.ApiKey),
-				"access_logs_services":         accessLogsSet,
-				"origin_logs_services":         originLogsSet,
-				"created_at":                   types.StringValue(lt.CreatedAt),
-				"updated_at":                   types.StringValue(lt.UpdatedAt),
+				"id":                   types.StringValue(lt.ID),
+				"name":                 types.StringPointerValue(lt.Name),
+				"type":                 types.StringValue(lt.Type),
+				"format":               types.StringPointerValue(lt.Format),
+				"compression":          types.StringPointerValue(lt.Compression),
+				"sampling":             samplingValue,
+				"endpoint":             types.StringPointerValue(lt.Endpoint),
+				"region":               types.StringPointerValue(lt.Region),
+				"bucket":               types.StringPointerValue(lt.Bucket),
+				"access_key":           types.StringPointerValue(lt.AccessKey),
+				"secret_key":           types.StringPointerValue(lt.SecretKey),
+				"signature_version":    types.StringPointerValue(lt.SignatureVersion),
+				"json_key":             types.StringPointerValue(lt.JsonKey),
+				"endpoint_protocol":    types.StringPointerValue(lt.EndpointProtocol),
+				"endpoint_suffix":      types.StringPointerValue(lt.EndpointSuffix),
+				"account_name":         types.StringPointerValue(lt.AccountName),
+				"account_key":          types.StringPointerValue(lt.AccountKey),
+				"container_name":       types.StringPointerValue(lt.ContainerName),
+				"prefix":               types.StringPointerValue(lt.Prefix),
+				"uri":                  types.StringPointerValue(lt.Uri),
+				"method":               types.StringPointerValue(lt.Method),
+				"auth":                 types.StringPointerValue(lt.Auth),
+				"username":             types.StringPointerValue(lt.Username),
+				"password":             types.StringPointerValue(lt.Password),
+				"token":                types.StringPointerValue(lt.Token),
+				"access_logs_services": accessLogsSet,
+				"origin_logs_services": originLogsSet,
+				"created_at":           types.StringValue(lt.CreatedAt),
+				"updated_at":           types.StringValue(lt.UpdatedAt),
 			},
 		)
 		items[i] = obj
@@ -331,4 +355,17 @@ func (d *LogTargetsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	data.LogTargets = listValue
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// servicesSetOrNull converts a services list to a set value, or a null set
+// when the API does not report the list.
+func servicesSetOrNull(services *[]string) types.Set {
+	if services == nil {
+		return types.SetNull(types.StringType)
+	}
+	elements := make([]attr.Value, len(*services))
+	for i, service := range *services {
+		elements[i] = types.StringValue(service)
+	}
+	return types.SetValueMust(types.StringType, elements)
 }

@@ -9,7 +9,8 @@ require (
 )
 
 require (
-	github.com/cachefly/cachefly-sdk-go v1.2.1
+	github.com/cachefly/cachefly-sdk-go v1.3.0
+	github.com/hashicorp/terraform-plugin-framework-validators v0.13.0
 	github.com/hashicorp/terraform-plugin-go v0.23.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
