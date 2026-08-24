@@ -331,18 +331,19 @@ func (r *ScriptConfigResource) mapScriptConfigToState(config *api.ScriptConfig, 
 		data.Services = types.SetValueMust(types.StringType, []attr.Value{})
 	}
 
-	// Convert Value interface{} to JSON string
+	// Convert Value to a string for state. The API returns the config value as a
+	// raw string (the YAML/JSON document the user supplied). json.Marshal of a
+	// string re-encodes it as a quoted, backslash-escaped JSON string, which
+	// double-encodes the value and makes the refreshed state differ from config
+	// on every plan ("inconsistent result after apply" + perpetual replace). So
+	// pass strings through verbatim, and only marshal non-string shapes.
 	if config.Value != nil {
-		valueBytes, err := json.Marshal(config.Value)
-		if err != nil {
-			// If marshaling fails, try to convert to string
-			if str, ok := config.Value.(string); ok {
-				data.Value = types.StringValue(str)
-			} else {
-				data.Value = types.StringNull()
-			}
-		} else {
+		if str, ok := config.Value.(string); ok {
+			data.Value = types.StringValue(str)
+		} else if valueBytes, err := json.Marshal(config.Value); err == nil {
 			data.Value = types.StringValue(string(valueBytes))
+		} else {
+			data.Value = types.StringNull()
 		}
 	} else {
 		data.Value = types.StringNull()
