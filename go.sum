@@ -11,8 +11,8 @@ github.com/apparentlymart/go-textseg/v15 v15.0.0 h1:uYvfpb3DyLSCGWnctWKGj857c6ew
 github.com/apparentlymart/go-textseg/v15 v15.0.0/go.mod h1:K8XmNZdhEBkdlyDdvbmmsvpAG721bKi0joRfFdHIWJ4=
 github.com/bufbuild/protocompile v0.4.0 h1:LbFKd2XowZvQ/kajzguUp2DC9UEIQhIq77fZZlaQsNA=
 github.com/bufbuild/protocompile v0.4.0/go.mod h1:3v93+mbWn/v3xzN+31nwkJfrEpAUwp+BagBSZWx+TP8=
-github.com/cachefly/cachefly-sdk-go v1.3.0 h1:x9fCd0+8b3pmFptF+0OsSlaRi+f2AtxFqt48vxiqN3k=
-github.com/cachefly/cachefly-sdk-go v1.3.0/go.mod h1:9zVwbp3HEkm7EqKCA57qaoDj0uoosToSiaFSTnpJOV4=
+github.com/cachefly/cachefly-sdk-go v1.4.0 h1:NjboqLhGRQ5HO1OlwP0pBg0++DYdBP9eX6rncslg9pk=
+github.com/cachefly/cachefly-sdk-go v1.4.0/go.mod h1:9zVwbp3HEkm7EqKCA57qaoDj0uoosToSiaFSTnpJOV4=
 github.com/cloudflare/circl v1.6.1 h1:zqIqSPIndyBh1bjLVVDHMPpVKqp8Su/V+6MeDzzQBQ0=
 github.com/cloudflare/circl v1.6.1/go.mod h1:uddAzsPgqdMAYatqJ0lsjX1oECcQLIlRpzZh3pJrofs=
 github.com/cyphar/filepath-securejoin v0.4.1 h1:JyxxyPEaktOD+GAnqIqTf9A8tHyAG22rowi7HkoSU1s=

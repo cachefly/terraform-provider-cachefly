@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -331,20 +332,43 @@ func (r *ScriptConfigResource) mapScriptConfigToState(config *api.ScriptConfig, 
 		data.Services = types.SetValueMust(types.StringType, []attr.Value{})
 	}
 
-	// Convert Value interface{} to JSON string
-	if config.Value != nil {
-		valueBytes, err := json.Marshal(config.Value)
-		if err != nil {
-			// If marshaling fails, try to convert to string
-			if str, ok := config.Value.(string); ok {
-				data.Value = types.StringValue(str)
-			} else {
-				data.Value = types.StringNull()
-			}
-		} else {
-			data.Value = types.StringValue(string(valueBytes))
-		}
-	} else {
-		data.Value = types.StringNull()
+	// Keep the current value when the API returns the same content in a
+	// different form (e.g. an object re-serialized with sorted keys), since
+	// Terraform compares the stored text with the configuration byte for byte.
+	apiValue := scriptConfigValueFromAPI(config.Value)
+	if data.Value.IsNull() || apiValue.IsNull() || !scriptConfigValuesEqual(data.Value.ValueString(), apiValue.ValueString()) {
+		data.Value = apiValue
 	}
+}
+
+// scriptConfigValueFromAPI converts the API value to text. Strings are used
+// as-is because they already hold the raw configuration; other JSON values are
+// serialized.
+func scriptConfigValueFromAPI(value interface{}) types.String {
+	switch v := value.(type) {
+	case nil:
+		return types.StringNull()
+	case string:
+		return types.StringValue(v)
+	default:
+		valueBytes, err := json.Marshal(v)
+		if err != nil {
+			return types.StringNull()
+		}
+		return types.StringValue(string(valueBytes))
+	}
+}
+
+// scriptConfigValuesEqual reports whether two values hold the same content. They
+// are compared as JSON when both parse, ignoring whitespace and key order, and
+// as plain text otherwise (e.g. YAML).
+func scriptConfigValuesEqual(a, b string) bool {
+	if a == b {
+		return true
+	}
+	var aValue, bValue interface{}
+	if json.Unmarshal([]byte(a), &aValue) != nil || json.Unmarshal([]byte(b), &bValue) != nil {
+		return false
+	}
+	return reflect.DeepEqual(aValue, bValue)
 }

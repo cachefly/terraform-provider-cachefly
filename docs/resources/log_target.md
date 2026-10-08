@@ -3,18 +3,18 @@
 page_title: "cachefly_log_target Resource - terraform-provider-cachefly"
 subcategory: ""
 description: |-
-  CacheFly Log Target resource. Manages log target configurations for storing access and origin logs.
+  CacheFly Log Target resource. Manages log target configurations for shipping access and origin logs.
 ---
 
 # cachefly_log_target (Resource)
 
-CacheFly Log Target resource. Manages log target configurations for storing access and origin logs.
+CacheFly Log Target resource. Manages log target configurations for shipping access and origin logs.
 
 ## Example Usage
 
 ```terraform
 # ===================================================================
-# CacheFly CDN - Log Target Setup Examples (S3, Elasticsearch, GCS)
+# CacheFly CDN - Log Target Setup Examples (S3, GCS, Azure Blob, HTTP)
 # ===================================================================
 
 terraform {
@@ -55,37 +55,57 @@ resource "cachefly_log_target" "s3_logs" {
   access_key = "AKIAIOSFODNN7EXAMPLE"
   secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
+  # Optional log delivery options (defaults shown)
+  format      = "JSON"
+  compression = "NONE"
+  sampling    = 100
+
   # Enable logs for selected services
   access_logs_services = [cachefly_service.example.id]
   origin_logs_services = [cachefly_service.example.id]
-
-  depends_on = [cachefly_service.example]
 }
 
 # -------------------------------------------------------------------
-# Example 3: Elasticsearch Log Target
+# Example 3: HTTP Log Target
 # -------------------------------------------------------------------
-resource "cachefly_log_target" "elasticsearch_logs" {
-  name                         = "example-dev-es-logs"
-  type                         = "ELASTICSEARCH"
-  hosts                        = [
-    "elasticsearch1.example.com:9200",
-    "elasticsearch2.example.com:9200",
-  ]
-  ssl                          = true
-  ssl_certificate_verification = true
-  index                        = "cachefly-logs"
-  user                         = "elastic"
-  password                     = "replace-with-real-password"
+resource "cachefly_log_target" "http_logs" {
+  name   = "example-dev-http-logs"
+  type   = "HTTP"
+  uri    = "https://logs.example.com/ingest"
+  method = "POST"
+
+  # Authentication: 'NONE' (default), 'BASIC' (username/password) or
+  # 'BEARER' (token)
+  auth     = "BASIC"
+  username = "loguser"
+  password = "replace-with-real-password"
+
+  format      = "NDJSON"
+  compression = "GZIP"
 
   access_logs_services = [cachefly_service.example.id]
   origin_logs_services = [cachefly_service.example.id]
-
-  depends_on = [cachefly_service.example]
 }
 
 # -------------------------------------------------------------------
-# Example 4: Google Cloud Storage Log Target (uncomment to use)
+# Example 4: Azure Blob Storage Log Target
+# -------------------------------------------------------------------
+resource "cachefly_log_target" "azure_logs" {
+  name           = "example-dev-azure-logs"
+  type           = "AZURE_BLOB"
+  account_name   = "mystorageaccount"
+  account_key    = "replace-with-real-account-key"
+  container_name = "cachefly-logs"
+
+  # Optional
+  prefix            = "cdn/"
+  endpoint_protocol = "HTTPS"
+
+  access_logs_services = [cachefly_service.example.id]
+}
+
+# -------------------------------------------------------------------
+# Example 5: Google Cloud Storage Log Target (uncomment to use)
 # -------------------------------------------------------------------
 # resource "cachefly_log_target" "gcs_logs" {
 #   name     = "example-dev-gcs-logs"
@@ -111,24 +131,28 @@ resource "cachefly_log_target" "elasticsearch_logs" {
 output "log_targets" {
   value = {
     s3 = {
-      id        = cachefly_log_target.s3_logs.id
-      name      = cachefly_log_target.s3_logs.name
-      type      = cachefly_log_target.s3_logs.type
-      created   = cachefly_log_target.s3_logs.created_at
-      updated   = cachefly_log_target.s3_logs.updated_at
-      services  = {
+      id      = cachefly_log_target.s3_logs.id
+      name    = cachefly_log_target.s3_logs.name
+      type    = cachefly_log_target.s3_logs.type
+      created = cachefly_log_target.s3_logs.created_at
+      updated = cachefly_log_target.s3_logs.updated_at
+      services = {
         access = cachefly_log_target.s3_logs.access_logs_services
         origin = cachefly_log_target.s3_logs.origin_logs_services
       }
     }
-    elasticsearch = {
-      id      = cachefly_log_target.elasticsearch_logs.id
-      name    = cachefly_log_target.elasticsearch_logs.name
-      type    = cachefly_log_target.elasticsearch_logs.type
-      hosts   = cachefly_log_target.elasticsearch_logs.hosts
-      index   = cachefly_log_target.elasticsearch_logs.index
-      created = cachefly_log_target.elasticsearch_logs.created_at
-      updated = cachefly_log_target.elasticsearch_logs.updated_at
+    http = {
+      id     = cachefly_log_target.http_logs.id
+      name   = cachefly_log_target.http_logs.name
+      type   = cachefly_log_target.http_logs.type
+      uri    = cachefly_log_target.http_logs.uri
+      method = cachefly_log_target.http_logs.method
+    }
+    azure = {
+      id        = cachefly_log_target.azure_logs.id
+      name      = cachefly_log_target.azure_logs.name
+      type      = cachefly_log_target.azure_logs.type
+      container = cachefly_log_target.azure_logs.container_name
     }
   }
 }
@@ -139,27 +163,35 @@ output "log_targets" {
 
 ### Required
 
-- `type` (String) Type of log target ('S3_BUCKET' | 'ELASTICSEARCH' | 'GOOGLE_BUCKET').
+- `type` (String) Type of log target ('S3_BUCKET' | 'GOOGLE_BUCKET' | 'AZURE_BLOB' | 'HTTP'). Changing this forces a new log target to be created.
 
 ### Optional
 
 - `access_key` (String, Sensitive) Access key (for S3 log targets).
 - `access_logs_services` (Set of String) List of service IDs to enable access logs for.
-- `api_key` (String, Sensitive) API key for authentication.
+- `account_key` (String, Sensitive) Storage account key (for Azure Blob log targets).
+- `account_name` (String) Storage account name (for Azure Blob log targets).
+- `auth` (String) Authentication scheme ('NONE' | 'BASIC' | 'BEARER') for HTTP log targets. Defaults to 'NONE'.
 - `bucket` (String) Bucket name (for S3 or Google Cloud log targets).
-- `endpoint` (String) Endpoint URL for the log target (for S3 log targets).
-- `hosts` (Set of String) List of hosts (for Elasticsearch log targets).
-- `index` (String) Index name (for Elasticsearch log targets).
-- `json_key` (String, Sensitive) JSON key (for Google Cloud log targets).
-- `name` (String) Name of the log target.
+- `compression` (String) Compression of the shipped logs ('NONE' | 'GZIP' | 'ZSTD'). Defaults to 'NONE'.
+- `container_name` (String) Blob container name (for Azure Blob log targets).
+- `endpoint` (String) Endpoint URL (for S3 log targets).
+- `endpoint_protocol` (String) Endpoint protocol ('HTTP' | 'HTTPS') for Azure Blob log targets. Defaults to 'HTTPS'.
+- `endpoint_suffix` (String) Endpoint suffix (for Azure Blob log targets).
+- `format` (String) Format of the shipped logs ('JSON' | 'NDJSON'). Defaults to 'JSON'.
+- `json_key` (String, Sensitive) Service account JSON key (for Google Cloud log targets).
+- `method` (String) HTTP method ('POST' | 'PUT') for HTTP log targets. Defaults to 'POST'.
+- `name` (String) Name of the log target (minimum 2 characters).
 - `origin_logs_services` (Set of String) List of service IDs to enable origin logs for.
-- `password` (String, Sensitive) Password for authentication.
-- `region` (String) Region for the log target (for S3 log targets).
+- `password` (String, Sensitive) Password for BASIC authentication (for HTTP log targets).
+- `prefix` (String) Path prefix within the container (for Azure Blob log targets).
+- `region` (String) Region (for S3 log targets).
+- `sampling` (Number) Percentage of logs to ship (0-100). Defaults to 100.
 - `secret_key` (String, Sensitive) Secret key (for S3 log targets).
-- `signature_version` (String) Signature version (for S3 log targets).
-- `ssl` (Boolean) Whether to use SSL/TLS.
-- `ssl_certificate_verification` (Boolean) Whether to verify SSL certificates.
-- `user` (String) Username for authentication.
+- `signature_version` (String) Signature version (for S3 log targets), e.g. 'v4'.
+- `token` (String, Sensitive) Token for BEARER authentication (for HTTP log targets).
+- `uri` (String) URI logs are shipped to (for HTTP log targets).
+- `username` (String) Username for BASIC authentication (for HTTP log targets).
 
 ### Read-Only
 

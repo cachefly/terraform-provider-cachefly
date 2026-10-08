@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -76,6 +77,9 @@ func (r *ServiceResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Description: "Whether to automatically provision SSL certificates.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"configuration_mode": schema.StringAttribute{
 				Description: "The configuration mode for the service.",
@@ -162,7 +166,7 @@ func (r *ServiceResource) Create(ctx context.Context, req resource.CreateRequest
 
 	if !data.AutoSSL.IsNull() && !data.AutoSSL.IsUnknown() {
 		needsUpdate = true
-		updateReq.AutoSSL = data.AutoSSL.ValueBool()
+		updateReq.AutoSSL = data.AutoSSL.ValueBoolPointer()
 	}
 
 	if !data.TLSProfile.IsNull() {
@@ -291,8 +295,8 @@ func (r *ServiceResource) Update(ctx context.Context, req resource.UpdateRequest
 		updateReq.Description = data.Description.ValueString()
 	}
 
-	if !data.AutoSSL.Equal(state.AutoSSL) {
-		updateReq.AutoSSL = data.AutoSSL.ValueBool()
+	if !data.AutoSSL.IsUnknown() && !data.AutoSSL.Equal(state.AutoSSL) {
+		updateReq.AutoSSL = data.AutoSSL.ValueBoolPointer()
 	}
 
 	if !data.TLSProfile.Equal(state.TLSProfile) {

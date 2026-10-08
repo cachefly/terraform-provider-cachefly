@@ -122,6 +122,9 @@ func (p *CacheFlyProvider) Resources(ctx context.Context) []func() resource.Reso
 		resources.NewScriptConfigResource,
 		resources.NewCertificateResource,
 		resources.NewLogTargetResource,
+		resources.NewEdgeControlScriptResource,
+		resources.NewEdgeControlKVResource,
+		resources.NewEdgeControlLibraryScriptResource,
 	}
 }
 
@@ -135,6 +138,11 @@ func (p *CacheFlyProvider) DataSources(ctx context.Context) []func() datasource.
 		datasources.NewLogTargetsDataSource,
 		datasources.NewUsersDataSource,
 		datasources.NewDeliveryRegionsDataSource,
+		datasources.NewEdgeControlScriptDataSource,
+		datasources.NewEdgeControlScriptVersionsDataSource,
+		datasources.NewEdgeControlKVDataSource,
+		datasources.NewEdgeControlLibraryScriptDataSource,
+		datasources.NewEdgeControlLibraryScriptsDataSource,
 	}
 }
 

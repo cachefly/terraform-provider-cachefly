@@ -1,8 +1,10 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -23,6 +25,19 @@ func TestAccPreCheck(t *testing.T) {
 
 	if v := os.Getenv("CACHEFLY_API_TOKEN"); v == "" {
 		t.Fatal("CACHEFLY_API_TOKEN must be set for acceptance tests")
+	}
+}
+
+// TestAccEdgeControlPreCheck runs TestAccPreCheck and skips the test when Edge
+// Control is not enabled for the test account.
+func TestAccEdgeControlPreCheck(t *testing.T) {
+	TestAccPreCheck(t)
+
+	if _, err := GetSDKClient().EdgeControlKV.GetAccount(context.Background()); err != nil {
+		if strings.Contains(err.Error(), "Edge Control is not enabled") {
+			t.Skip("Edge Control is not enabled for the test account")
+		}
+		t.Fatalf("Could not check whether Edge Control is enabled: %v", err)
 	}
 }
 

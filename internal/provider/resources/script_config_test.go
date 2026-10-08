@@ -138,7 +138,7 @@ func TestAccScriptConfigResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccScriptConfigResourceConfig(rName, definitionID),
+				Config: testAccScriptConfigResourceConfig(rName, definitionID, `{"something":2324}`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckScriptConfigExists(resourceName),
 					resource.TestCheckResourceAttr(resourceName, "name", rName),
@@ -154,6 +154,13 @@ func TestAccScriptConfigResource(t *testing.T) {
 				ImportState:             true,
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"updated_at"},
+			},
+			// Same content written differently must be stored as written
+			{
+				Config: testAccScriptConfigResourceConfig(rName, definitionID, `{ "something": 2324 }`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "value", `{ "something": 2324 }`),
+				),
 			},
 		},
 	})
@@ -213,14 +220,14 @@ func checkScriptConfigDestroy(s *terraform.State) error {
 }
 
 // Test configuration for basic script config
-func testAccScriptConfigResourceConfig(name string, definitionID string) string {
+func testAccScriptConfigResourceConfig(name string, definitionID string, value string) string {
 	return fmt.Sprintf(`
 provider "cachefly" {}
 
 resource "cachefly_script_config" %q {
   name                     = %q
   script_config_definition = %q
-  value                    = "{\"something\":2324}"
+  value                    = %q
 }
-`, name, name, definitionID)
+`, name, name, definitionID, value)
 }

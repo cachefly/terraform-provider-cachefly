@@ -143,6 +143,42 @@ func TestAccServiceResource(t *testing.T) {
 	})
 }
 
+func TestAccServiceResourceAutoSSL(t *testing.T) {
+	rName := "test-autossl-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	resourceName := "cachefly_service." + rName
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { provider.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: provider.TestAccProtoV6ProviderFactories,
+		CheckDestroy:             checkServiceDestroy,
+		Steps: []resource.TestStep{
+			// Enable auto_ssl on create
+			{
+				Config: testAccServiceResourceConfigAutoSSL(rName, rName+" description", "true"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckServiceExists(resourceName),
+					resource.TestCheckResourceAttr(resourceName, "auto_ssl", "true"),
+				),
+			},
+			// Unrelated update with auto_ssl unset must leave it enabled
+			{
+				Config: testAccServiceResourceConfigAutoSSL(rName, "Updated service description", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "description", "Updated service description"),
+					resource.TestCheckResourceAttr(resourceName, "auto_ssl", "true"),
+				),
+			},
+			// Disable auto_ssl
+			{
+				Config: testAccServiceResourceConfigAutoSSL(rName, "Updated service description", "false"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "auto_ssl", "false"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccServiceResourceWithOptions(t *testing.T) {
 	rName := "test-options-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
 	resourceName := "cachefly_service." + rName
@@ -296,6 +332,25 @@ resource "cachefly_service" %[1]q {
   delivery_region    = %[3]q
 }
 `, name, tlsProfileId, deliveryRegionId)
+}
+
+// Test configuration for service with auto_ssl; an empty autoSSL leaves the attribute unset
+func testAccServiceResourceConfigAutoSSL(name string, description string, autoSSL string) string {
+	autoSSLLine := ""
+	if autoSSL != "" {
+		autoSSLLine = "auto_ssl    = " + autoSSL
+	}
+
+	return fmt.Sprintf(`
+provider "cachefly" {}
+
+resource "cachefly_service" %[1]q {
+  name        = %[1]q
+  unique_name = "%[1]s-unique"
+  description = %[2]q
+  %[3]s
+}
+`, name, description, autoSSLLine)
 }
 
 // Test configuration for service with basic options

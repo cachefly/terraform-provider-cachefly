@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 )
@@ -185,7 +186,7 @@ func TestProviderResources(t *testing.T) {
 
 	resources := provider.Resources(ctx)
 
-	expectedResourceCount := 7 // Updated to include log_target resource
+	expectedResourceCount := 10
 	assert.Len(t, resources, expectedResourceCount, "Should have expected number of resources")
 
 	// Test that each resource can be instantiated
@@ -202,7 +203,7 @@ func TestProviderDataSources(t *testing.T) {
 
 	dataSources := provider.DataSources(ctx)
 
-	expectedDataSourceCount := 6 //
+	expectedDataSourceCount := 13
 	assert.Len(t, dataSources, expectedDataSourceCount, "Should have expected number of data sources")
 
 	// Test that each data source can be instantiated
@@ -210,4 +211,26 @@ func TestProviderDataSources(t *testing.T) {
 		dataSource := dataSourceFunc()
 		assert.NotNil(t, dataSource, "Data source %d should not be nil", i)
 	}
+}
+
+// Test that every resource and data source schema passes the framework's
+// implementation checks, which otherwise only run when Terraform loads the provider
+func TestProviderGetSchema(t *testing.T) {
+	server, err := TestAccProtoV6ProviderFactories["cachefly"]()
+	if err != nil {
+		t.Fatalf("Failed to create provider server: %v", err)
+	}
+
+	resp, err := server.GetProviderSchema(context.Background(), &tfprotov6.GetProviderSchemaRequest{})
+	if err != nil {
+		t.Fatalf("GetProviderSchema returned an error: %v", err)
+	}
+
+	for _, d := range resp.Diagnostics {
+		if d.Severity == tfprotov6.DiagnosticSeverityError {
+			t.Errorf("Schema error: %s: %s", d.Summary, d.Detail)
+		}
+	}
+	assert.Len(t, resp.ResourceSchemas, 10, "Should expose every resource schema")
+	assert.Len(t, resp.DataSourceSchemas, 13, "Should expose every data source schema")
 }
